@@ -152,9 +152,10 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 - [x] Monorepo scaffold (`core`, `cli`)
 - [x] Lockfile readers: npm, pnpm
 - [x] Data fetchers: deps.dev, npm downloads
-- [ ] Data fetchers: npm per-version metadata (size), GitHub (optional token)
+- [x] Data fetchers: npm package size
+- [ ] Data fetchers: GitHub (optional token) — archived, bus factor, issue responsiveness
 - [x] Local cache
-- [ ] Scoring model v1: verdicts, reasons, score + golden set test
+- [x] Scoring model v1: verdicts, reasons, score + golden set test (56 packages)
 - [ ] Legacy advice from e18e `module-replacements`
 - [x] Dependency paths ("why is this here?")
 - [ ] Terminal report + `--json`

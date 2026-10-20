@@ -1,0 +1,122 @@
+[
+  {
+    "package": "request@2.88.2",
+    "expected": "deprecated",
+    "why": "deprecated by its author in 2020"
+  },
+  {
+    "package": "node-sass@9.0.0",
+    "expected": "deprecated",
+    "why": "LibSass is end-of-life; use sass"
+  },
+  { "package": "tslint@6.1.3", "expected": "deprecated", "why": "replaced by typescript-eslint" },
+  { "package": "left-pad@1.3.0", "expected": "deprecated", "why": "use String.prototype.padStart" },
+  {
+    "package": "querystring@0.2.1",
+    "expected": "deprecated",
+    "why": "legacy API, use URLSearchParams"
+  },
+  { "package": "har-validator@5.1.5", "expected": "deprecated", "why": "deprecated with request" },
+  { "package": "q@1.5.1", "expected": "deprecated", "why": "use native promises" },
+  { "package": "@babel/polyfill@7.12.1", "expected": "deprecated", "why": "replaced by core-js" },
+  { "package": "popper.js@1.16.1", "expected": "deprecated", "why": "renamed to @popperjs/core" },
+  { "package": "gulp-util@3.0.8", "expected": "deprecated", "why": "split into separate modules" },
+  {
+    "package": "request-promise@4.2.6",
+    "expected": "deprecated",
+    "why": "deprecated with request"
+  },
+  { "package": "node-uuid@1.4.8", "expected": "deprecated", "why": "renamed to uuid" },
+  { "package": "jade@1.11.0", "expected": "deprecated", "why": "renamed to pug" },
+  { "package": "istanbul@0.4.5", "expected": "deprecated", "why": "replaced by nyc" },
+  {
+    "package": "uuid@3.4.0",
+    "expected": "deprecated",
+    "why": "old major deprecated; the package itself is active, so the advice is to upgrade"
+  },
+  {
+    "package": "glob@7.2.3",
+    "expected": "deprecated",
+    "why": "versions before 9 are unsupported; the package itself is active"
+  },
+
+  {
+    "package": "colors@1.4.0",
+    "expected": "abandoned",
+    "why": "sabotaged by its maintainer in 2022, issues pile up"
+  },
+  {
+    "package": "enzyme@3.11.0",
+    "expected": "abandoned",
+    "why": "no React 18+ support, hundreds of open issues"
+  },
+  {
+    "package": "karma@6.4.4",
+    "expected": "abandoned",
+    "why": "officially no longer maintained (README)"
+  },
+  {
+    "package": "bluebird@3.7.2",
+    "expected": ["abandoned", "stale"],
+    "why": "no release since 2019; maintainers recommend native promises"
+  },
+  {
+    "package": "uglify-js@3.19.3",
+    "expected": ["abandoned", "stale"],
+    "why": "large codebase, maintainer inactive since 2024; superseded by terser"
+  },
+  {
+    "package": "bower@1.8.14",
+    "expected": ["stale", "abandoned"],
+    "why": "large, inactive for years; superseded by npm/yarn"
+  },
+
+  { "package": "ms@2.1.3", "expected": "finished", "why": "tiny and done" },
+  { "package": "inherits@2.0.4", "expected": "finished", "why": "tiny and done" },
+  { "package": "is-number@7.0.0", "expected": "finished", "why": "tiny and done" },
+  { "package": "escape-string-regexp@4.0.0", "expected": "finished", "why": "tiny and done" },
+  { "package": "mkdirp@3.0.1", "expected": "finished", "why": "small, one open issue" },
+  { "package": "wrappy@1.0.2", "expected": "finished", "why": "tiny and done" },
+  { "package": "once@1.4.0", "expected": "finished", "why": "tiny and done" },
+  { "package": "concat-map@0.0.2", "expected": "finished", "why": "tiny and done" },
+  { "package": "escape-html@1.0.3", "expected": "finished", "why": "tiny and done" },
+  { "package": "array-flatten@1.1.1", "expected": "finished", "why": "tiny and done" },
+  { "package": "safe-buffer@5.2.1", "expected": "finished", "why": "small and done" },
+  { "package": "fs.realpath@1.0.0", "expected": "finished", "why": "tiny and done" },
+  { "package": "ee-first@1.1.1", "expected": "finished", "why": "tiny and done" },
+  { "package": "depd@2.0.0", "expected": "finished", "why": "small and done" },
+  { "package": "through@2.3.8", "expected": "finished", "why": "tiny and done" },
+  {
+    "package": "isarray@2.0.5",
+    "expected": ["finished", "active"],
+    "why": "tiny and done, with occasional repository commits"
+  },
+
+  { "package": "express@5.3.0", "expected": "active", "why": "actively developed" },
+  { "package": "axios@1.20.0", "expected": "active", "why": "actively developed" },
+  { "package": "react@19.3.1", "expected": "active", "why": "actively developed" },
+  { "package": "lodash@4.18.1", "expected": "active", "why": "maintained again since 2025" },
+  { "package": "chalk@6.0.1", "expected": "active", "why": "actively developed" },
+  { "package": "uuid@14.0.3", "expected": "active", "why": "actively developed" },
+  { "package": "core-js@3.51.0", "expected": "active", "why": "actively developed" },
+  { "package": "date-fns@4.4.0", "expected": "active", "why": "actively developed" },
+  { "package": "dayjs@1.11.23", "expected": "active", "why": "actively developed" },
+  {
+    "package": "moment@2.31.0",
+    "expected": "active",
+    "why": "still maintained; 'legacy' is advice, not health"
+  },
+  { "package": "typescript@7.0.2", "expected": "active", "why": "actively developed" },
+  { "package": "vite@8.3.4", "expected": "active", "why": "actively developed" },
+  { "package": "zod@4.6.7", "expected": "active", "why": "actively developed" },
+  { "package": "eslint@10.13.0", "expected": "active", "why": "actively developed" },
+  { "package": "prettier@3.9.10", "expected": "active", "why": "actively developed" },
+  { "package": "balanced-match@5.0.0", "expected": "active", "why": "recently released" },
+  { "package": "rimraf@6.1.3", "expected": "active", "why": "recently released" },
+
+  {
+    "package": "vitals-golden-does-not-exist@1.0.0",
+    "expected": "unknown",
+    "why": "not on npm: must never be judged"
+  }
+]

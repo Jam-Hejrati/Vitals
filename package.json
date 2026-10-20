@@ -13,12 +13,14 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "golden:record": "tsc -b && node packages/core/scripts/record-golden.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.5",
     "eslint": "10.13.0",
+    "globals": "17.13.0",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.0",
