@@ -28,7 +28,7 @@ A package can be fully up to date, have zero known CVEs, and still be abandoned.
 ## Principles
 
 1. **Trust beats coverage.** A false "abandoned" flag on a healthy package costs more than missing a
-   real problem. Every score is explainable — we always show *why*.
+   real problem. Every score is explainable — we always show _why_.
 2. **Finished is not abandoned.** A small, stable package with no releases in years can be perfectly
    healthy. Scoring must separate "done" from "dead".
 3. **Actionable over informative.** Every warning points to an action: which direct dependency pulled
@@ -43,23 +43,23 @@ A package can be fully up to date, have zero known CVEs, and still be abandoned.
 - **Open source (MIT):** `core`, `cli`, and later the GitHub Action and MCP server.
 - **Paid (later):** hosted product for organizations — multi-repo monitoring, alerts, history,
   policies, compliance reports.
-- The paid product is built *on top of* the same open core. The open-source tool must always be
+- The paid product is built _on top of_ the same open core. The open-source tool must always be
   genuinely useful on its own.
 
 ---
 
 ## MVP — v0.1 (JavaScript)
 
-| # | Feature | Notes |
-|---|---------|-------|
-| 1 | Read `package-lock.json` and `pnpm-lock.yaml` | yarn and bun later |
-| 2 | Health score (0–100) per dependency, with reasons | separates finished from abandoned |
-| 3 | Flags: deprecated, archived repo, single active maintainer, stale + unanswered issues | bus factor from recent commit authors, not npm `maintainers` |
-| 4 | "Why is this here?" — dependency path for transitive packages | |
-| 5 | Terminal report — shows problems only by default | `--all` shows everything |
-| 6 | `--json` output | versioned schema |
-| 7 | `--ci` diff mode — fail only on **newly added** unhealthy dependencies | the adoption hook for teams |
-| 8 | Local cache | fast repeat runs, fewer API calls |
+| #   | Feature                                                                               | Notes                                                        |
+| --- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 1   | Read `package-lock.json` and `pnpm-lock.yaml`                                         | yarn and bun later                                           |
+| 2   | Health score (0–100) per dependency, with reasons                                     | separates finished from abandoned                            |
+| 3   | Flags: deprecated, archived repo, single active maintainer, stale + unanswered issues | bus factor from recent commit authors, not npm `maintainers` |
+| 4   | "Why is this here?" — dependency path for transitive packages                         |                                                              |
+| 5   | Terminal report — shows problems only by default                                      | `--all` shows everything                                     |
+| 6   | `--json` output                                                                       | versioned schema                                             |
+| 7   | `--ci` diff mode — fail only on **newly added** unhealthy dependencies                | the adoption hook for teams                                  |
+| 8   | Local cache                                                                           | fast repeat runs, fewer API calls                            |
 
 ### Planned usage
 
@@ -79,7 +79,7 @@ npx vitals --ci --fail-on=high   # non-zero exit if a newly added dependency is 
 
 ### Tech
 
-- TypeScript, Node.js ≥ 20
+- TypeScript, Node.js ≥ 22.12 (Node 20 is end-of-life)
 - pnpm workspaces monorepo
 - Vitest for tests
 - Published to npm
@@ -113,6 +113,7 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 ## Roadmap
 
 ### Phase 1 — MVP (v0.1, JavaScript)
+
 - [ ] Monorepo scaffold (`core`, `cli`)
 - [ ] Lockfile readers: npm, pnpm
 - [ ] Data fetchers: deps.dev, npm registry, GitHub (optional)
@@ -124,6 +125,7 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 - [ ] README with demo GIF, publish to npm
 
 ### Phase 2 — Adoption
+
 - [ ] GitHub Action
 - [ ] Alternatives suggestions (seeded from e18e `module-replacements`)
 - [ ] Health trend between runs
@@ -132,21 +134,23 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 - [ ] MCP server for AI agents
 
 ### Phase 3 — More ecosystems
+
 - [ ] Python (`requirements.txt`, `pyproject.toml`, `poetry.lock`, `uv.lock`)
 - [ ] Go, Rust, others via deps.dev
 
 ### Phase 4 — Product
+
 - [ ] Hosted org dashboard, continuous monitoring, alerts
 - [ ] Public health index website + API
 - [ ] Policies and compliance reports
 
 ## Competitive landscape
 
-| Tool | Focus | How Vitals differs |
-|------|-------|--------------------|
-| `npm outdated`, Renovate, Dependabot | versions | Vitals measures maintenance, not version lag |
-| `npm audit`, Snyk, Socket, Sonatype | vulnerabilities / supply-chain security | maintenance health done in depth, free, explainable |
-| OpenSSF Scorecard, deps.dev | raw security / project signals | Vitals builds on them and turns them into a clear answer for developers |
+| Tool                                 | Focus                                   | How Vitals differs                                                      |
+| ------------------------------------ | --------------------------------------- | ----------------------------------------------------------------------- |
+| `npm outdated`, Renovate, Dependabot | versions                                | Vitals measures maintenance, not version lag                            |
+| `npm audit`, Snyk, Socket, Sonatype  | vulnerabilities / supply-chain security | maintenance health done in depth, free, explainable                     |
+| OpenSSF Scorecard, deps.dev          | raw security / project signals          | Vitals builds on them and turns them into a clear answer for developers |
 
 Main risk: larger players add similar features. Defense: speed, accuracy and trust, community, and
 historical data.

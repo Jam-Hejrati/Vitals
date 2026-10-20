@@ -1,0 +1,20 @@
+{
+  "name": "@vitals/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dependency maintenance-health engine: reads lockfiles, fetches signals, computes scores.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  }
+}
