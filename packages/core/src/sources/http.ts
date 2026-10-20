@@ -36,21 +36,33 @@ export class HttpClient {
     this.userAgent = options.userAgent ?? 'vitals (dependency health checker)';
   }
 
-  getJson<T>(url: string): Promise<T | undefined> {
-    return this.request<T>(url, { method: 'GET' });
+  async getJson<T>(url: string): Promise<T | undefined> {
+    const response = await this.send(url, { method: 'GET' });
+    return response && ((await response.json()) as T);
+  }
+
+  /** Size in bytes of the resource at `url`, fetched as a one-byte range so nothing is downloaded. */
+  async getSize(url: string): Promise<number | undefined> {
+    const response = await this.send(url, { method: 'GET', headers: { range: 'bytes=0-0' } });
+    if (!response) return undefined;
+    await response.body?.cancel();
+    const total = response.headers.get('content-range')?.match(/\/(\d+)$/)?.[1];
+    const size = Number(total ?? response.headers.get('content-length'));
+    return Number.isFinite(size) && size > 0 ? size : undefined;
   }
 
   async postJson<T>(url: string, body: unknown): Promise<T> {
-    const result = await this.request<T>(url, {
+    const response = await this.send(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (result === undefined) throw new HttpError(404, url);
-    return result;
+    if (!response) throw new HttpError(404, url);
+    return (await response.json()) as T;
   }
 
-  private async request<T>(url: string, init: RequestInit): Promise<T | undefined> {
+  /** Resolves to a successful response, or `undefined` for 404. */
+  private async send(url: string, init: RequestInit): Promise<Response | undefined> {
     for (let attempt = 0; ; attempt++) {
       let response: Response;
       try {
@@ -65,7 +77,7 @@ export class HttpClient {
         continue;
       }
 
-      if (response.ok) return (await response.json()) as T;
+      if (response.ok) return response;
       if (response.status === 404) return undefined;
       if ((response.status === 429 || response.status >= 500) && attempt < this.retries) {
         await sleep(this.backoff(attempt, response.headers.get('retry-after')));

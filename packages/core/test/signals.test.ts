@@ -85,6 +85,8 @@ describe('collectSignals', () => {
     });
 
     expect([...signals.keys()]).toEqual(['old@1.0.0']);
+    // Released within the year, so its size does not matter and is not fetched.
+    expect(fetch.requests.some((r) => r.url.startsWith('https://registry.npmjs.org/'))).toBe(false);
     expect(signals.get('old@1.0.0')).toEqual({
       id: 'old@1.0.0',
       name: 'old',
@@ -97,6 +99,8 @@ describe('collectSignals', () => {
       lastPublishedAt: '2026-03-01T00:00:00Z',
       versionCount: 3,
       releasesLastYear: 2,
+      stableReleasesLastYear: 1,
+      dependencyCount: 0,
       licenses: ['ISC'],
       weeklyDownloads: 1234,
       repository: {
@@ -125,7 +129,28 @@ describe('collectSignals', () => {
       found: false,
       versionCount: 0,
       releasesLastYear: 0,
+      stableReleasesLastYear: 0,
+      dependencyCount: 0,
       licenses: [],
+    });
+  });
+
+  it('fetches the latest size of packages without a release in the last year', async () => {
+    const fetch = fakeFetch({
+      ...routes,
+      'https://registry.npmjs.org/old/latest': () => ({
+        dist: { unpackedSize: 4096, fileCount: 3 },
+      }),
+    });
+    const signals = await collectSignals(graph, {
+      http: new HttpClient({ fetch, retryDelayMs: 0 }),
+      cache: new MemoryCache(),
+      now: new Date('2028-01-01T00:00:00Z'),
+    });
+    expect(signals.get('old@1.0.0')).toMatchObject({
+      releasesLastYear: 0,
+      unpackedSize: 4096,
+      fileCount: 3,
     });
   });
 });

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { FileCache, HttpClient, HttpError, MemoryCache } from '../src/index.js';
 import { DepsDevClient } from '../src/sources/depsdev.js';
 import { NpmDownloadsClient } from '../src/sources/npm-downloads.js';
+import { NpmRegistryClient } from '../src/sources/npm-registry.js';
 import { fakeFetch } from './fake-fetch.js';
 
 const http = (fetch: ReturnType<typeof fakeFetch>) =>
@@ -32,6 +33,14 @@ describe('HttpClient', () => {
     const fetch = fakeFetch({ 'https://x.test/': () => new Response('', { status: 500 }) });
     await expect(http(fetch).getJson('https://x.test/down')).rejects.toThrow(HttpError);
     expect(fetch.requests).toHaveLength(3);
+  });
+
+  it('reads a resource size from a one-byte range request', async () => {
+    const fetch = fakeFetch({
+      'https://x.test/': () =>
+        new Response('x', { status: 206, headers: { 'content-range': 'bytes 0-0/1979' } }),
+    });
+    expect(await http(fetch).getSize('https://x.test/pkg.tgz')).toBe(1979);
   });
 
   it('does not retry client errors', async () => {
@@ -133,6 +142,29 @@ describe('DepsDevClient', () => {
       undefined,
       'page-2',
     ]);
+  });
+});
+
+describe('NpmRegistryClient', () => {
+  it('reads sizes of the latest version, falling back to the tarball size', async () => {
+    const fetch = fakeFetch({
+      'https://registry.npmjs.org/@s%2Fnew/latest': () => ({
+        dist: { unpackedSize: 4096, fileCount: 3 },
+      }),
+      'https://registry.npmjs.org/old/latest': () => ({
+        dist: { tarball: 'https://registry.npmjs.org/old/-/old-1.0.0.tgz' },
+      }),
+      'https://registry.npmjs.org/old/-/': () =>
+        new Response('x', { status: 206, headers: { 'content-range': 'bytes 0-0/2030' } }),
+    });
+    const client = new NpmRegistryClient(http(fetch), new MemoryCache());
+
+    const sizes = await client.getLatestSizes(['@s/new', 'old', 'missing']);
+    expect(Object.fromEntries(sizes)).toEqual({
+      '@s/new': { unpackedSize: 4096, fileCount: 3 },
+      old: { tarballSize: 2030 },
+      missing: null,
+    });
   });
 });
 

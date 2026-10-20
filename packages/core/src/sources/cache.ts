@@ -5,10 +5,10 @@ import { join } from 'node:path';
 
 /**
  * Key-value cache for fetched data. Values may be `null` to remember "not found";
- * `undefined` means a miss.
+ * `undefined` means a miss. `maxAgeMs` overrides the cache's default lifetime for one lookup.
  */
 export interface Cache {
-  get<T>(namespace: string, key: string): Promise<T | null | undefined>;
+  get<T>(namespace: string, key: string, maxAgeMs?: number): Promise<T | null | undefined>;
   set<T>(namespace: string, key: string, value: T | null): Promise<void>;
 }
 
@@ -27,14 +27,18 @@ export class FileCache implements Cache {
     private readonly now: () => number = Date.now,
   ) {}
 
-  async get<T>(namespace: string, key: string): Promise<T | null | undefined> {
+  async get<T>(
+    namespace: string,
+    key: string,
+    maxAgeMs: number = this.ttlMs,
+  ): Promise<T | null | undefined> {
     let entry: Entry;
     try {
       entry = JSON.parse(await readFile(this.path(namespace, key), 'utf8'));
     } catch {
       return undefined;
     }
-    if (this.now() - entry.storedAt > this.ttlMs) return undefined;
+    if (this.now() - entry.storedAt > maxAgeMs) return undefined;
     return entry.value as T | null;
   }
 
@@ -88,11 +92,12 @@ export async function cached<T>(
   namespace: string,
   keys: string[],
   fetchMissing: (keys: string[]) => Promise<Map<string, T>>,
+  maxAgeMs?: number,
 ): Promise<Map<string, T | null>> {
   const results = new Map<string, T | null>();
   const missing: string[] = [];
   for (const key of new Set(keys)) {
-    const hit = await cache.get<T>(namespace, key);
+    const hit = await cache.get<T>(namespace, key, maxAgeMs);
     if (hit === undefined) missing.push(key);
     else results.set(key, hit);
   }
