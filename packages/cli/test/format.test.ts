@@ -1,6 +1,12 @@
-import { buildReport, parseNpmLockfile, type PackageSignals } from '@vitals/core';
+import {
+  buildReport,
+  evaluateCi,
+  packageNames,
+  parseNpmLockfile,
+  type PackageSignals,
+} from '@vitals/core';
 import { describe, expect, it } from 'vitest';
-import { formatReport } from '../src/format.js';
+import { formatCi, formatReport } from '../src/format.js';
 
 const now = new Date('2026-10-20T00:00:00Z');
 
@@ -202,5 +208,48 @@ describe('formatReport GitHub notices', () => {
 
   it('tells users without a token how to get these checks', () => {
     expect(formatReport(report, { ...plain, github: false })).toContain('Tip: set GITHUB_TOKEN');
+  });
+});
+
+describe('formatCi', () => {
+  const base = new Set(['fine', 'p', 'q']);
+  const failing = evaluateCi(problems, {
+    failOn: 'abandoned',
+    base: 'origin/main',
+    baseNames: base,
+  });
+
+  it('groups what a pull request adds under the dependency that brings it in', () => {
+    const text = formatCi(problems, failing, plain);
+    expect(text).toContain('Compared with origin/main: 10 new packages');
+    expect(text).toContain('old@1.0.0  DEPRECATED  (direct)');
+    expect(text).toContain('Also brings in 1 package that needs attention:');
+    expect(text).toContain('✖ inner@1.0.0  deprecated');
+    expect(text).toContain(
+      '✖ Failed: 2 new dependencies are deprecated or abandoned (--fail-on abandoned).',
+    );
+  });
+
+  it('keeps problems below the threshold out of the failure', () => {
+    const text = formatCi(problems, failing, plain);
+    expect(text).toContain('Worth a look (not failing the check):');
+    expect(text).toContain('c1@1.0.0  stale');
+  });
+
+  it('passes when nothing new is wrong', () => {
+    const passing = evaluateCi(problems, {
+      failOn: 'abandoned',
+      base: 'HEAD',
+      baseNames: packageNames(graph),
+    });
+    const text = formatCi(problems, passing, plain);
+    expect(text).toContain('Compared with HEAD: 0 new packages');
+    expect(text).toContain('✔ Passed: no new dependency is deprecated or abandoned.');
+  });
+
+  it('says so when no base was given', () => {
+    const text = formatCi(problems, evaluateCi(problems, { failOn: 'stale' }), plain);
+    expect(text).toContain('No base given: checking all 13 packages');
+    expect(text).toContain('(--fail-on stale)');
   });
 });

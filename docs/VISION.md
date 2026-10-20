@@ -159,7 +159,7 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 - [x] Legacy advice from e18e `module-replacements`
 - [x] Dependency paths ("why is this here?")
 - [x] Terminal report + `--json`
-- [ ] `--ci` diff mode
+- [x] `--ci` diff mode
 - [ ] README with demo GIF, publish to npm
 
 ### Phase 2 — Adoption

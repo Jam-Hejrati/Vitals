@@ -10,7 +10,21 @@ export {
 export { LockfileError } from './lockfile/errors.js';
 export { parseNpmLockfile } from './lockfile/npm.js';
 export { parsePnpmLockfile } from './lockfile/pnpm.js';
-export { loadProject, type LockfileKind, type Project } from './project.js';
+export {
+  LOCKFILES,
+  loadProject,
+  parseLockfile,
+  type LockfileKind,
+  type Project,
+} from './project.js';
+export {
+  evaluateCi,
+  FAIL_LEVELS,
+  packageNames,
+  type CiOptions,
+  type CiResult,
+  type FailLevel,
+} from './ci.js';
 export { findReplacements, type Suggestion } from './replacements.js';
 export {
   analyzeProject,

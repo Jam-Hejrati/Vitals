@@ -14,10 +14,19 @@ export interface Project {
   graph: DependencyGraph;
 }
 
-const LOCKFILES: Record<LockfileKind, string> = {
+export const LOCKFILES: Record<LockfileKind, string> = {
   npm: 'package-lock.json',
   pnpm: 'pnpm-lock.yaml',
 };
+
+/** Parses lockfile `content` of the given kind. `root` names the project where the lockfile cannot. */
+export function parseLockfile(
+  kind: LockfileKind,
+  content: string,
+  root?: DependencyGraph['root'],
+): DependencyGraph {
+  return kind === 'npm' ? parseNpmLockfile(content) : parsePnpmLockfile(content, root);
+}
 
 const UNSUPPORTED_LOCKFILES = ['yarn.lock', 'bun.lock', 'bun.lockb'];
 
@@ -53,13 +62,10 @@ export async function loadProject(dir: string): Promise<Project> {
     found.toSorted((a, b) => b.modified - a.modified)[0]!;
 
   const content = await readFile(chosen.path, 'utf8');
-  const graph =
-    chosen.kind === 'npm'
-      ? parseNpmLockfile(content)
-      : parsePnpmLockfile(content, {
-          name: typeof manifest?.name === 'string' ? manifest.name : 'root',
-          version: typeof manifest?.version === 'string' ? manifest.version : '0.0.0',
-        });
+  const graph = parseLockfile(chosen.kind, content, {
+    name: typeof manifest?.name === 'string' ? manifest.name : 'root',
+    version: typeof manifest?.version === 'string' ? manifest.version : '0.0.0',
+  });
 
   return { lockfile: chosen.path, kind: chosen.kind, graph };
 }
