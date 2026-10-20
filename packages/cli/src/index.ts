@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { LockfileError, parseNpmLockfile } from '@vitals/core';
+import { LockfileError, loadProject } from '@vitals/core';
 
 const HELP = `Usage: vitals [directory] [options]
 
@@ -32,19 +32,14 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const lockfilePath = resolve(positionals[0] ?? '.', 'package-lock.json');
-  let content: string;
-  try {
-    content = await readFile(lockfilePath, 'utf8');
-  } catch {
-    process.stderr.write(`No package-lock.json found at ${lockfilePath}\n`);
-    return 2;
-  }
-
-  const graph = parseNpmLockfile(content);
+  const { lockfile, graph } = await loadProject(resolve(positionals[0] ?? '.'));
+  const external = [...graph.packages.values()].filter((pkg) => !pkg.local);
+  const direct = new Set(
+    graph.directDependencies.map((d) => d.id).filter((id) => !graph.packages.get(id)?.local),
+  );
   process.stdout.write(
-    `${graph.root.name}: ${graph.directDependencies.length} direct, ` +
-      `${graph.packages.size} total packages.\n` +
+    `${graph.root.name} (${relative(process.cwd(), lockfile) || lockfile}): ` +
+      `${direct.size} direct, ${external.length} total packages.\n` +
       'Health scoring is not implemented yet.\n',
   );
   return 0;

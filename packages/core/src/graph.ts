@@ -10,6 +10,8 @@ export interface PackageNode {
   dev: boolean;
   /** Only reachable through optionalDependencies. */
   optional: boolean;
+  /** Lives in the project itself (workspace package or `file:`/`link:` dependency); never scored. */
+  local: boolean;
   /** Ids of the packages this one depends on. */
   dependencies: string[];
 }
@@ -17,6 +19,8 @@ export interface PackageNode {
 export interface DirectDependency {
   id: string;
   type: DependencyType;
+  /** Project directory that declares it, relative to the root: `.` or a workspace path. */
+  importer: string;
 }
 
 export interface DependencyGraph {
@@ -27,6 +31,19 @@ export interface DependencyGraph {
 
 export function packageId(name: string, version: string): string {
   return `${name}@${version}`;
+}
+
+/** Ids of every package reachable from `startIds`, including the start packages themselves. */
+export function reachableFrom(graph: DependencyGraph, startIds: Iterable<string>): Set<string> {
+  const seen = new Set<string>();
+  const stack = [...startIds];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    stack.push(...(graph.packages.get(id)?.dependencies ?? []));
+  }
+  return seen;
 }
 
 /**

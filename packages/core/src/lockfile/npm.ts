@@ -23,6 +23,13 @@ interface LockEntry {
 
 const NODE_MODULES = 'node_modules/';
 
+const DIRECT_FIELDS: [keyof LockEntry, DependencyType][] = [
+  ['dependencies', 'prod'],
+  ['devDependencies', 'dev'],
+  ['optionalDependencies', 'optional'],
+  ['peerDependencies', 'peer'],
+];
+
 /** Parses an npm `package-lock.json` (lockfileVersion 2 or 3) into a dependency graph. */
 export function parseNpmLockfile(content: string): DependencyGraph {
   let lock: { name?: string; version?: string; packages?: Record<string, LockEntry> };
@@ -78,6 +85,7 @@ export function parseNpmLockfile(content: string): DependencyGraph {
         version,
         dev: entry.dev === true,
         optional: entry.optional === true,
+        local: isWorkspaceLocation(location),
         dependencies: [],
       });
     }
@@ -104,20 +112,21 @@ export function parseNpmLockfile(content: string): DependencyGraph {
     }
   }
 
+  // The root and every workspace package declare their own direct dependencies.
+  const importers = Object.entries(entries).filter(
+    ([location, entry]) => location === '' || (isWorkspaceLocation(location) && !entry.link),
+  );
   const directDependencies: DirectDependency[] = [];
-  const seenDirect = new Set<string>();
-  const directFields: [keyof LockEntry, DependencyType][] = [
-    ['dependencies', 'prod'],
-    ['devDependencies', 'dev'],
-    ['optionalDependencies', 'optional'],
-    ['peerDependencies', 'peer'],
-  ];
-  for (const [field, type] of directFields) {
-    for (const name of dependencyNames(rootEntry, [field])) {
-      const id = resolveId('', name);
-      if (id !== undefined && !seenDirect.has(id)) {
-        seenDirect.add(id);
-        directDependencies.push({ id, type });
+  for (const [location, entry] of importers) {
+    const importer = location === '' ? '.' : location;
+    const seen = new Set<string>();
+    for (const [field, type] of DIRECT_FIELDS) {
+      for (const name of dependencyNames(entry, [field])) {
+        const id = resolveId(location, name);
+        if (id !== undefined && !seen.has(id)) {
+          seen.add(id);
+          directDependencies.push({ id, type, importer });
+        }
       }
     }
   }
@@ -137,10 +146,14 @@ function parentLocation(location: string): string {
   return index === -1 ? '' : location.slice(0, index);
 }
 
+/** Workspace packages live in project directories, not under node_modules. */
+function isWorkspaceLocation(location: string): boolean {
+  return location !== '' && !location.includes(NODE_MODULES);
+}
+
 function nameAtLocation(location: string, entry: LockEntry): string {
-  const index = location.lastIndexOf(NODE_MODULES);
-  if (index === -1) return entry.name ?? location; // workspace package directory
-  return location.slice(index + NODE_MODULES.length);
+  if (isWorkspaceLocation(location)) return entry.name ?? location;
+  return location.slice(location.lastIndexOf(NODE_MODULES) + NODE_MODULES.length);
 }
 
 function dependencyNames(entry: LockEntry, fields: (keyof LockEntry)[]): string[] {

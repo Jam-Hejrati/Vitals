@@ -32,9 +32,9 @@ describe('parseNpmLockfile', () => {
 
   it('lists direct dependencies with their type', () => {
     expect(graph.directDependencies).toEqual([
-      { id: 'express@4.18.0', type: 'prod' },
-      { id: '@scope/util@2.1.0', type: 'prod' },
-      { id: 'vitest@1.6.0', type: 'dev' },
+      { id: 'express@4.18.0', type: 'prod', importer: '.' },
+      { id: '@scope/util@2.1.0', type: 'prod', importer: '.' },
+      { id: 'vitest@1.6.0', type: 'dev', importer: '.' },
     ]);
   });
 
@@ -83,8 +83,13 @@ describe('parseNpmLockfile', () => {
         'node_modules/left': { version: '1.0.0' },
       }),
     );
-    expect(workspace.directDependencies).toEqual([{ id: 'lib@0.1.0', type: 'prod' }]);
+    expect(workspace.directDependencies).toEqual([
+      { id: 'lib@0.1.0', type: 'prod', importer: '.' },
+      { id: 'left@1.0.0', type: 'prod', importer: 'packages/lib' },
+    ]);
     expect(workspace.packages.get('lib@0.1.0')?.dependencies).toEqual(['left@1.0.0']);
+    expect(workspace.packages.get('lib@0.1.0')?.local).toBe(true);
+    expect(workspace.packages.get('left@1.0.0')?.local).toBe(false);
   });
 
   it('ignores optional dependencies that are not installed', () => {
