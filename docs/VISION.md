@@ -53,8 +53,9 @@ A package can be fully up to date, have zero known CVEs, and still be abandoned.
 | #   | Feature                                                                               | Notes                                                        |
 | --- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | 1   | Read `package-lock.json` and `pnpm-lock.yaml`                                         | yarn and bun later                                           |
-| 2   | Health score (0–100) per dependency, with reasons                                     | separates finished from abandoned                            |
+| 2   | Health verdict + reasons per dependency, with a 0–100 score                           | separates finished from abandoned — see Scoring model        |
 | 3   | Flags: deprecated, archived repo, single active maintainer, stale + unanswered issues | bus factor from recent commit authors, not npm `maintainers` |
+| 9   | Legacy advice — "consider `date-fns` / `dayjs`" for packages like `moment`            | from e18e `module-replacements`; never changes the verdict   |
 | 4   | "Why is this here?" — dependency path for transitive packages                         |                                                              |
 | 5   | Terminal report — shows problems only by default                                      | `--all` shows everything                                     |
 | 6   | `--json` output                                                                       | versioned schema                                             |
@@ -73,9 +74,43 @@ npx vitals --ci --fail-on=high   # non-zero exit if a newly added dependency is 
 ### Data sources
 
 - **deps.dev API** (primary) — package → repo mapping, versions, OpenSSF Scorecard, multi-ecosystem, no auth
-- **npm registry** — release dates, deprecation flags, publish metadata
-- **GitHub API** (optional token) — commit activity, active contributors, issue responsiveness, archived status
+- **npm registry** — weekly downloads (bulk API); per-version metadata for package size
+  (small documents, immutable, cached long-term). The full package document is too large to fetch.
+- **GitHub API** (optional `GITHUB_TOKEN`, part of the MVP) — archived status, active committers
+  (bus factor), issue responsiveness. Enriches direct dependencies and flagged packages; Vitals works
+  without it.
+- **e18e `module-replacements`** — curated legacy/replacement data for advice
 - **Local cache** — on-disk, with TTLs per signal
+
+### Scoring model
+
+Decided after looking at real data for ~25 well-known packages (deprecated, finished, abandoned,
+stale, legacy and healthy ones).
+
+**Verdict first, score second.** Each package gets a verdict with human-readable reasons; the 0–100
+score is secondary and used for sorting, trends and CI thresholds.
+
+| Verdict           | Meaning                                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔴 **Deprecated** | The author deprecated the package — overrides everything. If only the installed version is deprecated, the advice is to upgrade.               |
+| 🔴 **Abandoned**  | Long without releases, no repository activity, **and** evidence of neglect: unmet demand (many open issues for its usage) or an archived repo. |
+| 🟠 **Stale**      | Activity stopped on a non-trivial package, without clear evidence of neglect yet.                                                              |
+| 🟢 **Finished**   | Small, stable, inactive, little unmet demand (e.g. `ms`, `inherits`). Healthy, labelled so users understand why.                               |
+| 🟢 **Active**     | Recent releases or commits.                                                                                                                    |
+
+Lessons from the data:
+
+- Release age alone flags `ms` and `inherits` as dead — the false positive that kills trust.
+  Finished packages are **tiny**, have **few open issues for their usage**, and are heavily used.
+- What separates `colors` (abandoned) from `inherits` (finished) is **unmet demand**.
+- npm `maintainers` is useless for bus factor (`ms` lists ~50 people); use commit authors.
+- "Legacy" (`moment`) cannot be seen in the numbers — it comes from curated data, as advice.
+- OpenSSF Scorecard is ~2 months old and missing for ~25% of repos; never the only activity source.
+
+**Golden set.** ~100 hand-labelled packages kept as a test. Every scoring change must keep it passing.
+
+**Default report** shows only problems (Deprecated, Abandoned, Stale) plus a one-line summary;
+`--all` shows everything.
 
 ### Tech
 
@@ -114,12 +149,14 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 
 ### Phase 1 — MVP (v0.1, JavaScript)
 
-- [ ] Monorepo scaffold (`core`, `cli`)
-- [ ] Lockfile readers: npm, pnpm
-- [ ] Data fetchers: deps.dev, npm registry, GitHub (optional)
-- [ ] Local cache
-- [ ] Scoring model v1 with reasons
-- [ ] Dependency paths ("why is this here?")
+- [x] Monorepo scaffold (`core`, `cli`)
+- [x] Lockfile readers: npm, pnpm
+- [x] Data fetchers: deps.dev, npm downloads
+- [ ] Data fetchers: npm per-version metadata (size), GitHub (optional token)
+- [x] Local cache
+- [ ] Scoring model v1: verdicts, reasons, score + golden set test
+- [ ] Legacy advice from e18e `module-replacements`
+- [x] Dependency paths ("why is this here?")
 - [ ] Terminal report + `--json`
 - [ ] `--ci` diff mode
 - [ ] README with demo GIF, publish to npm
@@ -127,7 +164,6 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 ### Phase 2 — Adoption
 
 - [ ] GitHub Action
-- [ ] Alternatives suggestions (seeded from e18e `module-replacements`)
 - [ ] Health trend between runs
 - [ ] README badge / project report card
 - [ ] yarn and bun lockfiles
@@ -157,10 +193,8 @@ historical data.
 
 ## Open questions
 
-- Scoring weights — start simple and transparent, configurable; calibrate against packages known to be
-  dead (`request`, `node-sass`, `moment`) and known to be finished-but-fine (`ms`, `inherits`).
-- How to detect "finished" packages reliably (size, dependents, issue ratio, API surface stability).
+- Exact thresholds for size, "long without releases" and unmet demand — tuned against the golden set.
 - Severity levels and default `--fail-on` threshold for CI.
 - History storage — SQLite in a user cache dir for local runs; JSON snapshot for CI.
-- npm package name — `vitals` is likely taken; check availability (`vitals-cli`, `@vitals/cli`, etc.)
-  before first publish.
+- npm package name — `vitals`, `vitals-cli` and `depvitals` are taken; `dep-vitals` was free (Oct 2026),
+  or publish under a personal scope. Decide before first publish.
