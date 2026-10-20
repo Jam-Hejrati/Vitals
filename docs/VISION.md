@@ -155,7 +155,7 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 - [x] Data fetchers: npm package size
 - [x] Data fetchers: GitHub (optional token) — archived repositories, single maintainer (issue responsiveness: later)
 - [x] Local cache
-- [x] Scoring model v1: verdicts, reasons, score + golden set test (56 packages)
+- [x] Scoring model v1: verdicts, reasons, score + golden set test (65 packages)
 - [x] Legacy advice from e18e `module-replacements`
 - [x] Dependency paths ("why is this here?")
 - [x] Terminal report + `--json`
