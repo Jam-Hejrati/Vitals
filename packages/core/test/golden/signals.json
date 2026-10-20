@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-10-20T12:42:49.880Z",
+  "recordedAt": "2026-10-20T13:23:04.596Z",
   "signals": {
     "@babel/polyfill@7.12.1": {
       "id": "@babel/polyfill@7.12.1",
@@ -16,10 +16,7 @@
       "releasesLastYear": 0,
       "stableReleasesLastYear": 0,
       "dependencyCount": 0,
-      "unpackedSize": 442528,
-      "fileCount": 10,
       "licenses": ["MIT"],
-      "weeklyDownloads": 1106594,
       "repository": {
         "id": "github.com/babel/babel",
         "openIssues": 805,
@@ -75,7 +72,6 @@
       "stableReleasesLastYear": 24,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 66557149,
       "repository": {
         "id": "github.com/axios/axios",
         "openIssues": 106,
@@ -102,7 +98,6 @@
       "stableReleasesLastYear": 4,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 252981739,
       "repository": {
         "id": "github.com/juliangruber/balanced-match",
         "openIssues": 10,
@@ -176,7 +171,6 @@
       "stableReleasesLastYear": 2,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 288552045,
       "repository": {
         "id": "github.com/chalk/chalk",
         "openIssues": 1,
@@ -187,6 +181,34 @@
         "maintainedScore": 8,
         "commitsLast90Days": 8,
         "issueActivityLast90Days": 2
+      }
+    },
+    "co@4.6.0": {
+      "id": "co@4.6.0",
+      "name": "co",
+      "version": "4.6.0",
+      "found": true,
+      "installedPublishedAt": "2015-07-09T22:30:44Z",
+      "latestVersion": "4.6.0",
+      "firstPublishedAt": "2013-06-06T20:24:55Z",
+      "lastPublishedAt": "2015-07-09T22:30:44Z",
+      "versionCount": 34,
+      "releasesLastYear": 0,
+      "stableReleasesLastYear": 0,
+      "dependencyCount": 0,
+      "tarballSize": 5880,
+      "licenses": ["MIT"],
+      "weeklyDownloads": 24958037,
+      "repository": {
+        "id": "github.com/tj/co",
+        "openIssues": 44,
+        "stars": 11827,
+        "forks": 779,
+        "scorecardScore": 2.5,
+        "scorecardDate": "2026-08-24T00:00:00Z",
+        "maintainedScore": 0,
+        "commitsLast90Days": 0,
+        "issueActivityLast90Days": 0
       }
     },
     "colors@1.4.0": {
@@ -261,7 +283,6 @@
       "stableReleasesLastYear": 5,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 41098135,
       "repository": {
         "id": "github.com/zloirock/core-js",
         "openIssues": 44,
@@ -288,7 +309,6 @@
       "stableReleasesLastYear": 4,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 56000589,
       "repository": {
         "id": "github.com/date-fns/date-fns",
         "openIssues": 1045,
@@ -315,7 +335,6 @@
       "stableReleasesLastYear": 5,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 44268397,
       "repository": {
         "id": "github.com/iamkun/dayjs",
         "openIssues": 1381,
@@ -326,6 +345,35 @@
         "maintainedScore": 7,
         "commitsLast90Days": 8,
         "issueActivityLast90Days": 1
+      }
+    },
+    "deepmerge@4.3.1": {
+      "id": "deepmerge@4.3.1",
+      "name": "deepmerge",
+      "version": "4.3.1",
+      "found": true,
+      "installedPublishedAt": "2023-03-16T22:58:56Z",
+      "latestVersion": "4.3.1",
+      "firstPublishedAt": "2012-01-31T17:35:02Z",
+      "lastPublishedAt": "2023-03-16T22:58:56Z",
+      "versionCount": 46,
+      "releasesLastYear": 0,
+      "stableReleasesLastYear": 0,
+      "dependencyCount": 0,
+      "unpackedSize": 31157,
+      "fileCount": 11,
+      "licenses": ["MIT"],
+      "weeklyDownloads": 59481723,
+      "repository": {
+        "id": "github.com/tehshrike/deepmerge",
+        "openIssues": 63,
+        "stars": 2818,
+        "forks": 222,
+        "scorecardScore": 2.3,
+        "scorecardDate": "2026-08-24T00:00:00Z",
+        "maintainedScore": 0,
+        "commitsLast90Days": 0,
+        "issueActivityLast90Days": 0
       }
     },
     "depd@2.0.0": {
@@ -485,7 +533,6 @@
       "stableReleasesLastYear": 27,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 96121047,
       "repository": {
         "id": "github.com/eslint/eslint",
         "openIssues": 123,
@@ -496,6 +543,35 @@
         "maintainedScore": 10,
         "commitsLast90Days": 30,
         "issueActivityLast90Days": 15
+      }
+    },
+    "esprima@4.0.1": {
+      "id": "esprima@4.0.1",
+      "name": "esprima",
+      "version": "4.0.1",
+      "found": true,
+      "installedPublishedAt": "2018-07-13T08:39:14Z",
+      "latestVersion": "4.0.1",
+      "firstPublishedAt": "2011-11-25T05:45:41Z",
+      "lastPublishedAt": "2018-07-13T08:39:14Z",
+      "versionCount": 46,
+      "releasesLastYear": 0,
+      "stableReleasesLastYear": 0,
+      "dependencyCount": 0,
+      "unpackedSize": 314361,
+      "fileCount": 7,
+      "licenses": ["BSD-2-Clause"],
+      "weeklyDownloads": 68246402,
+      "repository": {
+        "id": "github.com/jquery/esprima",
+        "openIssues": 151,
+        "stars": 7141,
+        "forks": 771,
+        "scorecardScore": 3.9,
+        "scorecardDate": "2026-08-24T00:00:00Z",
+        "maintainedScore": 0,
+        "commitsLast90Days": 0,
+        "issueActivityLast90Days": 0
       }
     },
     "express@5.3.0": {
@@ -512,7 +588,6 @@
       "stableReleasesLastYear": 7,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 87449208,
       "repository": {
         "id": "github.com/expressjs/express",
         "openIssues": 236,
@@ -523,6 +598,35 @@
         "maintainedScore": 10,
         "commitsLast90Days": 17,
         "issueActivityLast90Days": 2
+      }
+    },
+    "flat@5.0.2": {
+      "id": "flat@5.0.2",
+      "name": "flat",
+      "version": "5.0.2",
+      "found": true,
+      "installedPublishedAt": "2020-08-06T15:29:02Z",
+      "latestVersion": "6.0.1",
+      "firstPublishedAt": "2012-10-05T16:52:58Z",
+      "lastPublishedAt": "2023-09-19T14:47:19Z",
+      "versionCount": 28,
+      "releasesLastYear": 0,
+      "stableReleasesLastYear": 0,
+      "dependencyCount": 0,
+      "unpackedSize": 11951,
+      "fileCount": 6,
+      "licenses": ["BSD-3-Clause"],
+      "weeklyDownloads": 15706148,
+      "repository": {
+        "id": "github.com/hughsk/flat",
+        "openIssues": 61,
+        "stars": 1819,
+        "forks": 196,
+        "scorecardScore": 3,
+        "scorecardDate": "2026-08-24T00:00:00Z",
+        "maintainedScore": 0,
+        "commitsLast90Days": 0,
+        "issueActivityLast90Days": 1
       }
     },
     "fs.realpath@1.0.0": {
@@ -568,7 +672,6 @@
       "stableReleasesLastYear": 10,
       "dependencyCount": 0,
       "licenses": ["ISC"],
-      "weeklyDownloads": 231042278,
       "repository": {
         "id": "github.com/isaacs/node-glob",
         "openIssues": 9,
@@ -634,6 +737,35 @@
         "stars": 64,
         "forks": 26,
         "scorecardScore": 4.2,
+        "scorecardDate": "2026-08-24T00:00:00Z",
+        "maintainedScore": 0,
+        "commitsLast90Days": 0,
+        "issueActivityLast90Days": 0
+      }
+    },
+    "http-proxy@1.18.1": {
+      "id": "http-proxy@1.18.1",
+      "name": "http-proxy",
+      "version": "1.18.1",
+      "found": true,
+      "installedPublishedAt": "2020-05-17T21:27:32Z",
+      "latestVersion": "1.18.1",
+      "firstPublishedAt": "2011-05-23T06:19:07Z",
+      "lastPublishedAt": "2020-05-17T21:27:32Z",
+      "versionCount": 85,
+      "releasesLastYear": 0,
+      "stableReleasesLastYear": 0,
+      "dependencyCount": 0,
+      "unpackedSize": 231812,
+      "fileCount": 16,
+      "licenses": ["MIT"],
+      "weeklyDownloads": 14028288,
+      "repository": {
+        "id": "github.com/http-party/node-http-proxy",
+        "openIssues": 619,
+        "stars": 14120,
+        "forks": 1991,
+        "scorecardScore": 3.1,
         "scorecardDate": "2026-08-24T00:00:00Z",
         "maintainedScore": 0,
         "commitsLast90Days": 0,
@@ -711,10 +843,7 @@
       "releasesLastYear": 0,
       "stableReleasesLastYear": 0,
       "dependencyCount": 0,
-      "unpackedSize": 3430,
-      "fileCount": 4,
       "licenses": ["MIT"],
-      "weeklyDownloads": 154683188,
       "repository": {
         "id": "github.com/juliangruber/isarray",
         "openIssues": 2,
@@ -857,7 +986,6 @@
       "stableReleasesLastYear": 3,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 94515109,
       "repository": {
         "id": "github.com/lodash/lodash",
         "openIssues": 121,
@@ -913,7 +1041,6 @@
       "stableReleasesLastYear": 1,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 22641771,
       "repository": {
         "id": "github.com/moment/moment",
         "openIssues": 60,
@@ -1040,6 +1167,35 @@
         "issueActivityLast90Days": 0
       }
     },
+    "pluralize@7.0.0": {
+      "id": "pluralize@7.0.0",
+      "name": "pluralize",
+      "version": "7.0.0",
+      "found": true,
+      "installedPublishedAt": "2017-08-20T18:18:37Z",
+      "latestVersion": "8.0.0",
+      "firstPublishedAt": "2013-04-01T18:11:50Z",
+      "lastPublishedAt": "2019-05-25T05:06:57Z",
+      "versionCount": 34,
+      "releasesLastYear": 0,
+      "stableReleasesLastYear": 0,
+      "dependencyCount": 0,
+      "unpackedSize": 17725,
+      "fileCount": 4,
+      "licenses": ["MIT"],
+      "weeklyDownloads": 23522439,
+      "repository": {
+        "id": "github.com/blakeembrey/pluralize",
+        "openIssues": 60,
+        "stars": 2212,
+        "forks": 185,
+        "scorecardScore": 3.9,
+        "scorecardDate": "2026-08-24T00:00:00Z",
+        "maintainedScore": 0,
+        "commitsLast90Days": 0,
+        "issueActivityLast90Days": 0
+      }
+    },
     "popper.js@1.16.1": {
       "id": "popper.js@1.16.1",
       "name": "popper.js",
@@ -1055,10 +1211,7 @@
       "releasesLastYear": 0,
       "stableReleasesLastYear": 0,
       "dependencyCount": 0,
-      "unpackedSize": 1723584,
-      "fileCount": 100,
       "licenses": ["MIT"],
-      "weeklyDownloads": 2600618,
       "repository": {
         "id": "github.com/fezvrasta/popper.js",
         "openIssues": 5,
@@ -1085,7 +1238,6 @@
       "stableReleasesLastYear": 22,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 81594759,
       "repository": {
         "id": "github.com/prettier/prettier",
         "openIssues": 1447,
@@ -1096,6 +1248,35 @@
         "maintainedScore": 10,
         "commitsLast90Days": 30,
         "issueActivityLast90Days": 5
+      }
+    },
+    "progress@2.0.3": {
+      "id": "progress@2.0.3",
+      "name": "progress",
+      "version": "2.0.3",
+      "found": true,
+      "installedPublishedAt": "2018-12-05T16:57:58Z",
+      "latestVersion": "2.0.3",
+      "firstPublishedAt": "2011-04-20T20:06:40Z",
+      "lastPublishedAt": "2018-12-05T16:57:58Z",
+      "versionCount": 20,
+      "releasesLastYear": 0,
+      "stableReleasesLastYear": 0,
+      "dependencyCount": 0,
+      "unpackedSize": 15499,
+      "fileCount": 7,
+      "licenses": ["MIT"],
+      "weeklyDownloads": 34803704,
+      "repository": {
+        "id": "github.com/visionmedia/node-progress",
+        "openIssues": 70,
+        "stars": 2988,
+        "forks": 217,
+        "scorecardScore": 2.9,
+        "scorecardDate": "2026-08-24T00:00:00Z",
+        "maintainedScore": 0,
+        "commitsLast90Days": 0,
+        "issueActivityLast90Days": 0
       }
     },
     "q@1.5.1": {
@@ -1141,10 +1322,7 @@
       "releasesLastYear": 0,
       "stableReleasesLastYear": 0,
       "dependencyCount": 0,
-      "unpackedSize": 9387,
-      "fileCount": 10,
       "licenses": ["MIT"],
-      "weeklyDownloads": 8028074,
       "repository": {
         "id": "github.com/gozala/querystring",
         "openIssues": 16,
@@ -1171,7 +1349,6 @@
       "stableReleasesLastYear": 29,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 116163376,
       "repository": {
         "id": "github.com/react/react",
         "openIssues": 1467,
@@ -1255,7 +1432,6 @@
       "stableReleasesLastYear": 4,
       "dependencyCount": 0,
       "licenses": ["BlueOak-1.0.0"],
-      "weeklyDownloads": 92721997,
       "repository": {
         "id": "github.com/isaacs/rimraf",
         "openIssues": 11,
@@ -1290,6 +1466,64 @@
         "openIssues": 16,
         "stars": 345,
         "forks": 47,
+        "scorecardScore": 2.5,
+        "scorecardDate": "2026-08-24T00:00:00Z",
+        "maintainedScore": 0,
+        "commitsLast90Days": 0,
+        "issueActivityLast90Days": 0
+      }
+    },
+    "source-map-support@0.5.21": {
+      "id": "source-map-support@0.5.21",
+      "name": "source-map-support",
+      "version": "0.5.21",
+      "found": true,
+      "installedPublishedAt": "2021-11-19T11:02:57Z",
+      "latestVersion": "0.5.21",
+      "firstPublishedAt": "2013-01-18T11:30:09Z",
+      "lastPublishedAt": "2021-11-19T11:02:57Z",
+      "versionCount": 66,
+      "releasesLastYear": 0,
+      "stableReleasesLastYear": 0,
+      "dependencyCount": 0,
+      "unpackedSize": 85177,
+      "fileCount": 7,
+      "licenses": ["MIT"],
+      "weeklyDownloads": 80639765,
+      "repository": {
+        "id": "github.com/evanw/node-source-map-support",
+        "openIssues": 126,
+        "stars": 2193,
+        "forks": 221,
+        "scorecardScore": 2.3,
+        "scorecardDate": "2026-08-24T00:00:00Z",
+        "maintainedScore": 0,
+        "commitsLast90Days": 0,
+        "issueActivityLast90Days": 0
+      }
+    },
+    "sprintf-js@1.0.3": {
+      "id": "sprintf-js@1.0.3",
+      "name": "sprintf-js",
+      "version": "1.0.3",
+      "found": true,
+      "installedPublishedAt": "2015-07-10T13:41:29Z",
+      "latestVersion": "1.1.3",
+      "firstPublishedAt": "2013-04-03T13:24:39Z",
+      "lastPublishedAt": "2023-09-11T13:12:09Z",
+      "versionCount": 8,
+      "releasesLastYear": 0,
+      "stableReleasesLastYear": 0,
+      "dependencyCount": 0,
+      "unpackedSize": 39879,
+      "fileCount": 11,
+      "licenses": ["BSD-3-Clause"],
+      "weeklyDownloads": 59200592,
+      "repository": {
+        "id": "github.com/alexei/sprintf.js",
+        "openIssues": 71,
+        "stars": 2143,
+        "forks": 291,
         "scorecardScore": 2.5,
         "scorecardDate": "2026-08-24T00:00:00Z",
         "maintainedScore": 0,
@@ -1366,7 +1600,6 @@
       "stableReleasesLastYear": 3,
       "dependencyCount": 0,
       "licenses": ["Apache-2.0"],
-      "weeklyDownloads": 184429796,
       "repository": {
         "id": "github.com/microsoft/typescript",
         "openIssues": 5131,
@@ -1422,7 +1655,6 @@
       "stableReleasesLastYear": 8,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 173698867,
       "repository": {
         "id": "github.com/uuidjs/uuid",
         "openIssues": 6,
@@ -1450,7 +1682,6 @@
       "stableReleasesLastYear": 8,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 173698867,
       "repository": {
         "id": "github.com/uuidjs/uuid",
         "openIssues": 6,
@@ -1488,7 +1719,6 @@
       "stableReleasesLastYear": 51,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 119005168,
       "repository": {
         "id": "github.com/vitejs/vite",
         "openIssues": 790,
@@ -1543,7 +1773,6 @@
       "stableReleasesLastYear": 27,
       "dependencyCount": 0,
       "licenses": ["MIT"],
-      "weeklyDownloads": 207048213,
       "repository": {
         "id": "github.com/colinhacks/zod",
         "openIssues": 88,

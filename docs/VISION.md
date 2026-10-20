@@ -199,3 +199,15 @@ historical data.
 - History storage — SQLite in a user cache dir for local runs; JSON snapshot for CI.
 - npm package name — `vitals`, `vitals-cli` and `depvitals` are taken; `dep-vitals` was free (Oct 2026),
   or publish under a personal scope. Decide before first publish.
+
+## Known limitations
+
+- **Issue counts are per repository, not per package.** A tiny package that lives in a large
+  monorepo inherits the whole repository's backlog (e.g. `confusing-browser-globals`, 2,408 issues
+  from the Create React App repo), which can make it look abandoned. Needs per-package signals.
+- **"Superseded by something built in" is invisible to the numbers.** Packages like
+  `source-map-support` are small and stable but replaced by platform features. The e18e data knows
+  this; using it as a signal for inactive packages is a candidate for a later version.
+- **Thresholds sit on edges.** Any cutoff misjudges packages just either side of it
+  (`cookie-parser` is a few percent over the small-package bar).
+- **Scorecard data is about two months old** and missing for roughly a quarter of repositories.

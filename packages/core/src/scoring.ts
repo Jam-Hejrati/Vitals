@@ -39,6 +39,12 @@ export interface Thresholds {
   unmetDemandMinIssues: number;
   /** ...and at least this many per million weekly downloads, so huge packages are not penalised. */
   unmetDemandIssuesPerMillionDownloads: number;
+  /**
+   * The same two limits for small packages, which are held to a stricter standard: a tiny utility
+   * has little reason to change, and its backlog is mostly feature requests.
+   */
+  unmetDemandSmallMinIssues: number;
+  unmetDemandSmallIssuesPerMillionDownloads: number;
   /** A single maintainer is only called out with at least this many recent commits to go on... */
   singleMaintainerMinCommits: number;
   /** ...and when one person wrote at least this share of them (0–1). */
@@ -52,6 +58,8 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   smallTarballBytes: 40_000,
   unmetDemandMinIssues: 20,
   unmetDemandIssuesPerMillionDownloads: 1,
+  unmetDemandSmallMinIssues: 30,
+  unmetDemandSmallIssuesPerMillionDownloads: 5,
   singleMaintainerMinCommits: 10,
   singleMaintainerShare: 0.9,
 };
@@ -168,14 +176,18 @@ export function assess(signals: PackageSignals, options: AssessOptions = {}): As
   ];
   if (commits === 0) reasons.push('no commits in the last 90 days');
 
-  const downloads = signals.weeklyDownloads;
-  const unmetDemand =
-    issues !== undefined &&
-    issues >= t.unmetDemandMinIssues &&
-    (!downloads || issues / (downloads / 1e6) >= t.unmetDemandIssuesPerMillionDownloads);
-
   const size = describeSize(signals, t);
   if (size === undefined) unknowns.push('package size');
+
+  const downloads = signals.weeklyDownloads;
+  const minIssues = size?.small ? t.unmetDemandSmallMinIssues : t.unmetDemandMinIssues;
+  const perMillion = size?.small
+    ? t.unmetDemandSmallIssuesPerMillionDownloads
+    : t.unmetDemandIssuesPerMillionDownloads;
+  const unmetDemand =
+    issues !== undefined &&
+    issues >= minIssues &&
+    (!downloads || issues / (downloads / 1e6) >= perMillion);
 
   const months = monthsSinceRelease ?? Infinity;
   // An archived repository is read-only: the maintainers have said no more changes are coming.

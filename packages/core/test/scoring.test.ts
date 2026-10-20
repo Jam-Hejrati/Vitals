@@ -173,3 +173,31 @@ describe('GitHub signals', () => {
     expect(result.warnings).toEqual([]);
   });
 });
+
+describe('small packages and open issues', () => {
+  const withIssues = (openIssues: number, overrides: Partial<PackageSignals> = {}) =>
+    assess(
+      signals({
+        unpackedSize: 5_000,
+        weeklyDownloads: 20_000_000,
+        repository: { id: 'r', openIssues, commitsLast90Days: 0, issueActivityLast90Days: 0 },
+        ...overrides,
+      }),
+      { now },
+    );
+
+  it('lets a small package with a moderate backlog be finished', () => {
+    // 60 issues for 20M downloads is 3 per million: enough to worry about a large package.
+    expect(withIssues(60).verdict).toBe('finished');
+    expect(withIssues(60, { unpackedSize: 900_000 }).verdict).toBe('abandoned');
+  });
+
+  it('still calls a small package abandoned when the backlog is overwhelming', () => {
+    // 150 issues for 20M downloads is 7.5 per million.
+    expect(withIssues(150).verdict).toBe('abandoned');
+  });
+
+  it('does not count a handful of issues against a small package', () => {
+    expect(withIssues(25, { weeklyDownloads: 1_000_000 }).verdict).toBe('finished');
+  });
+});
