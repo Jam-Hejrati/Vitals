@@ -129,3 +129,36 @@ describe('formatReport without problems', () => {
     expect(formatReport(problems, { ...plain, color: true })).toContain('\x1b[31m');
   });
 });
+
+describe('formatReport replacements', () => {
+  const lockfile = JSON.stringify({
+    name: 'app',
+    version: '1.0.0',
+    lockfileVersion: 3,
+    packages: {
+      '': { name: 'app', version: '1.0.0', dependencies: { 'left-pad': '1', moment: '1' } },
+      'node_modules/left-pad': { version: '1.0.0' },
+      'node_modules/moment': { version: '1.0.0' },
+    },
+  });
+  const report = buildReport(
+    { lockfile: '/app/package-lock.json', kind: 'npm', graph: parseNpmLockfile(lockfile) },
+    new Map(
+      [signal('left-pad', { latestDeprecated: 'use padStart' }), signal('moment')].map((s) => [
+        s.id,
+        s,
+      ]),
+    ),
+    { now },
+  );
+
+  it('suggests what to use instead for packages that need attention', () => {
+    const text = formatReport(report, plain);
+    expect(text).toContain('→ instead: String.prototype.padStart (built in)');
+  });
+
+  it('does not nag about healthy packages unless asked for everything', () => {
+    expect(formatReport(report, plain)).not.toContain('date-fns');
+    expect(formatReport(report, { ...plain, all: true })).toContain('instead: day.js, date-fns');
+  });
+});

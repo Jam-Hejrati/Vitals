@@ -1,4 +1,4 @@
-import type { PackageReport, Report, Verdict } from '@vitals/core';
+import type { PackageReport, Report, Suggestion, Verdict } from '@vitals/core';
 
 export interface FormatOptions {
   /** List healthy packages too, and every nested problem instead of the first few. */
@@ -14,6 +14,8 @@ const PROBLEM_ORDER: Record<Problem, number> = { deprecated: 0, abandoned: 1, st
 const MAX_NESTED = 5;
 const MAX_SHARED = 8;
 const DETAIL_WIDTH = 100;
+const MAX_SUGGESTIONS = 3;
+const MAX_SUGGESTIONS_INLINE = 2;
 
 const STYLES = { red: 31, yellow: 33, green: 32, gray: 90, bold: 1 } as const;
 type Style = keyof typeof STYLES;
@@ -181,6 +183,9 @@ function describeProblem(pkg: PackageReport, paint: Paint): string[] {
   ];
   for (const reason of pkg.reasons) lines.push(`    · ${reason}`);
   for (const advice of pkg.advice) lines.push(`    → ${advice}`);
+  if (pkg.replacements.length > 0) {
+    lines.push(`    → instead: ${suggestionList(pkg.replacements, MAX_SUGGESTIONS)}`);
+  }
   if (pkg.unknowns.length > 0) {
     lines.push(paint('gray', `    ? could not check: ${pkg.unknowns.join('; ')}`));
   }
@@ -195,11 +200,23 @@ function oneLine(pkg: PackageReport, paint: Paint): string {
     reasons.length > 0
       ? reasons.join(', ')
       : `could not check: ${pkg.unknowns.join('; ') || 'no data'}`;
-  const advice = pkg.advice.length > 0 ? ` → ${pkg.advice.join(', ')}` : '';
+  const advice = [
+    ...pkg.advice,
+    ...(pkg.replacements.length > 0
+      ? [`instead: ${suggestionList(pkg.replacements, MAX_SUGGESTIONS_INLINE)}`]
+      : []),
+  ];
   return (
     `${paint(color, icon)} ${pkg.name}@${pkg.version}  ${paint(color, pkg.verdict)}  ` +
-    `${paint('gray', truncate(detail, DETAIL_WIDTH))}${advice}`
+    `${paint('gray', truncate(detail, DETAIL_WIDTH))}${advice.map((a) => ` → ${a}`).join('')}`
   );
+}
+
+function suggestionList(suggestions: Suggestion[], max: number): string {
+  return suggestions
+    .slice(0, max)
+    .map((s) => (s.kind === 'native' ? `${s.name} (built in)` : s.name))
+    .join(', ');
 }
 
 function tags(pkg: PackageReport, paint: Paint): string {

@@ -19,5 +19,8 @@
   },
   "dependencies": {
     "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "module-replacements": "3.4.0"
   }
 }

@@ -11,6 +11,7 @@ export { LockfileError } from './lockfile/errors.js';
 export { parseNpmLockfile } from './lockfile/npm.js';
 export { parsePnpmLockfile } from './lockfile/pnpm.js';
 export { loadProject, type LockfileKind, type Project } from './project.js';
+export { findReplacements, type Suggestion } from './replacements.js';
 export {
   analyzeProject,
   buildReport,

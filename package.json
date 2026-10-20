@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "vitals": "node packages/cli/dist/index.js",
+    "replacements:update": "node packages/core/scripts/update-replacements.mjs",
     "golden:record": "tsc -b && node packages/core/scripts/record-golden.mjs"
   },
   "devDependencies": {
