@@ -158,7 +158,7 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 - [x] Scoring model v1: verdicts, reasons, score + golden set test (56 packages)
 - [ ] Legacy advice from e18e `module-replacements`
 - [x] Dependency paths ("why is this here?")
-- [ ] Terminal report + `--json`
+- [x] Terminal report + `--json`
 - [ ] `--ci` diff mode
 - [ ] README with demo GIF, publish to npm
 

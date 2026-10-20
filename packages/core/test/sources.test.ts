@@ -184,6 +184,19 @@ describe('NpmDownloadsClient', () => {
     expect(fetch.requests).toHaveLength(2);
   });
 
+  it('survives rate limiting and retries the failed names on the next run', async () => {
+    let limited = true;
+    const fetch = fakeFetch({
+      'https://api.npmjs.org/downloads/point/last-week/': () =>
+        limited ? new Response('', { status: 429 }) : { downloads: 7 },
+    });
+    const client = new NpmDownloadsClient(http(fetch), new MemoryCache());
+
+    expect((await client.getWeeklyDownloads(['@s/c'])).get('@s/c')).toBeNull();
+    limited = false;
+    expect((await client.getWeeklyDownloads(['@s/c'])).get('@s/c')).toBe(7);
+  });
+
   it('asks for a lone unscoped name in the single-package format', async () => {
     const fetch = fakeFetch({
       'https://api.npmjs.org/downloads/point/last-week/a': () => ({ downloads: 5 }),

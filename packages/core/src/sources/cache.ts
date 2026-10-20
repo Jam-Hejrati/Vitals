@@ -85,13 +85,14 @@ export function defaultCacheDir(env: NodeJS.ProcessEnv = process.env): string {
 
 /**
  * Looks every key up in the cache, fetches the misses in one go, and caches what was fetched.
- * Keys the fetcher does not return are cached as not found.
+ * Keys the fetcher does not return are cached as not found; keys it returns as `undefined`
+ * failed to fetch, and are not cached so the next run tries again.
  */
 export async function cached<T>(
   cache: Cache,
   namespace: string,
   keys: string[],
-  fetchMissing: (keys: string[]) => Promise<Map<string, T>>,
+  fetchMissing: (keys: string[]) => Promise<Map<string, T | undefined>>,
   maxAgeMs?: number,
 ): Promise<Map<string, T | null>> {
   const results = new Map<string, T | null>();
@@ -104,6 +105,11 @@ export async function cached<T>(
   if (missing.length > 0) {
     const fetched = await fetchMissing(missing);
     for (const key of missing) {
+      if (fetched.has(key) && fetched.get(key) === undefined) {
+        // The fetch failed: report the key as missing, but do not remember that.
+        results.set(key, null);
+        continue;
+      }
       const value = fetched.get(key) ?? null;
       results.set(key, value);
       await cache.set(namespace, key, value);

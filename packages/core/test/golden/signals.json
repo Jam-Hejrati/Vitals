@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-10-20T11:37:13.342Z",
+  "recordedAt": "2026-10-20T12:42:49.880Z",
   "signals": {
     "@babel/polyfill@7.12.1": {
       "id": "@babel/polyfill@7.12.1",
@@ -462,8 +462,8 @@
       "repository": {
         "id": "github.com/sindresorhus/escape-string-regexp",
         "openIssues": 0,
-        "stars": 593,
-        "forks": 59,
+        "stars": 595,
+        "forks": 60,
         "scorecardScore": 3.7,
         "scorecardDate": "2026-08-24T00:00:00Z",
         "maintainedScore": 0,

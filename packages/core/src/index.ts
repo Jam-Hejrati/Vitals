@@ -12,6 +12,14 @@ export { parseNpmLockfile } from './lockfile/npm.js';
 export { parsePnpmLockfile } from './lockfile/pnpm.js';
 export { loadProject, type LockfileKind, type Project } from './project.js';
 export {
+  analyzeProject,
+  buildReport,
+  REPORT_SCHEMA_VERSION,
+  type AnalyzeOptions,
+  type PackageReport,
+  type Report,
+} from './report.js';
+export {
   assess,
   DEFAULT_THRESHOLDS,
   formatAge,
