@@ -31,6 +31,7 @@ export {
   type Confidence,
   type Thresholds,
   type Verdict,
+  type Warning,
 } from './scoring.js';
 export {
   collectSignals,

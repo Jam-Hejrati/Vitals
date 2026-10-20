@@ -153,7 +153,7 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 - [x] Lockfile readers: npm, pnpm
 - [x] Data fetchers: deps.dev, npm downloads
 - [x] Data fetchers: npm package size
-- [ ] Data fetchers: GitHub (optional token) — archived, bus factor, issue responsiveness
+- [x] Data fetchers: GitHub (optional token) — archived repositories, single maintainer (issue responsiveness: later)
 - [x] Local cache
 - [x] Scoring model v1: verdicts, reasons, score + golden set test (56 packages)
 - [x] Legacy advice from e18e `module-replacements`

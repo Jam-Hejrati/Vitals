@@ -36,8 +36,8 @@ export class HttpClient {
     this.userAgent = options.userAgent ?? 'vitals (dependency health checker)';
   }
 
-  async getJson<T>(url: string): Promise<T | undefined> {
-    const response = await this.send(url, { method: 'GET' });
+  async getJson<T>(url: string, headers?: Record<string, string>): Promise<T | undefined> {
+    const response = await this.send(url, { method: 'GET', ...(headers && { headers }) });
     return response && ((await response.json()) as T);
   }
 

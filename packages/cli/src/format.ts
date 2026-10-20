@@ -4,6 +4,8 @@ export interface FormatOptions {
   /** List healthy packages too, and every nested problem instead of the first few. */
   all: boolean;
   color: boolean;
+  /** Whether GitHub data was used. When explicitly false, the report mentions how to enable it. */
+  github?: boolean;
 }
 
 type Problem = 'deprecated' | 'abandoned' | 'stale';
@@ -71,6 +73,8 @@ export function formatReport(report: Report, options: FormatOptions): string {
     lines.push('');
   }
 
+  lines.push(...formatNotices(report, paint));
+
   if (groups.length === 0 && shared.length === 0) {
     lines.push(paint('green', '✔ No dependency needs attention.'), '');
   }
@@ -103,6 +107,14 @@ export function formatReport(report: Report, options: FormatOptions): string {
         ),
       );
     }
+  }
+  if (options.github === false) {
+    lines.push(
+      paint(
+        'gray',
+        'Tip: set GITHUB_TOKEN to also check archived repositories and single-maintainer packages.',
+      ),
+    );
   }
   return lines.join('\n') + '\n';
 }
@@ -182,6 +194,7 @@ function describeProblem(pkg: PackageReport, paint: Paint): string[] {
       `${paint(color, pkg.verdict.toUpperCase())}  ${tags(pkg, paint)}`,
   ];
   for (const reason of pkg.reasons) lines.push(`    · ${reason}`);
+  for (const warning of pkg.warnings) lines.push(paint('yellow', `    ! ${warning.message}`));
   for (const advice of pkg.advice) lines.push(`    → ${advice}`);
   if (pkg.replacements.length > 0) {
     lines.push(`    → instead: ${suggestionList(pkg.replacements, MAX_SUGGESTIONS)}`);
@@ -210,6 +223,20 @@ function oneLine(pkg: PackageReport, paint: Paint): string {
     `${paint(color, icon)} ${pkg.name}@${pkg.version}  ${paint(color, pkg.verdict)}  ` +
     `${paint('gray', truncate(detail, DETAIL_WIDTH))}${advice.map((a) => ` → ${a}`).join('')}`
   );
+}
+
+/** Direct dependencies that are healthy, but worth knowing about. Needs GitHub data. */
+function formatNotices(report: Report, paint: Paint): string[] {
+  const lines: string[] = [];
+  const notice = (code: 'single-maintainer' | 'archived', title: string) => {
+    const names = report.packages
+      .filter((p) => p.direct && !isProblem(p) && p.warnings.some((w) => w.code === code))
+      .map((p) => p.name);
+    if (names.length > 0) lines.push(paint('bold', title), `  ${names.join(', ')}`, '');
+  };
+  notice('archived', 'Archived repositories (no further fixes expected):');
+  notice('single-maintainer', 'Maintained by one person (direct dependencies):');
+  return lines;
 }
 
 function suggestionList(suggestions: Suggestion[], max: number): string {

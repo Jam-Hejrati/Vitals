@@ -1,6 +1,7 @@
 import type { DependencyGraph, PackageNode } from './graph.js';
 import { defaultCacheDir, FileCache, type Cache } from './sources/cache.js';
 import { DepsDevClient, type DepsDevPackage, type DepsDevProject } from './sources/depsdev.js';
+import { GitHubClient, type GitHubRepository } from './sources/github.js';
 import { HttpClient } from './sources/http.js';
 import { NpmDownloadsClient } from './sources/npm-downloads.js';
 import { NpmRegistryClient } from './sources/npm-registry.js';
@@ -52,12 +53,24 @@ export interface RepositorySignals {
   maintainedScore?: number;
   commitsLast90Days?: number;
   issueActivityLast90Days?: number;
+  /** The remaining fields come from the GitHub API and are only present with a token. */
+  archived?: boolean;
+  /** People who authored commits in the last year (from a sample of up to 100), bots excluded. */
+  committers?: number;
+  /** Share of those commits written by the most active person, 0–1. */
+  topCommitterShare?: number;
+  sampledCommits?: number;
 }
 
 export interface CollectSignalsOptions {
   http?: HttpClient;
   cache?: Cache;
   now?: Date;
+  /**
+   * A GitHub token enables the GitHub API for direct dependencies and inactive packages: archived
+   * repositories and who actually commits. Without one, those signals are simply absent.
+   */
+  githubToken?: string;
 }
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -118,6 +131,23 @@ export async function collectSignals(
     downloads.getWeeklyDownloads(inactiveNames),
   ]);
 
+  let repositories = new Map<string, GitHubRepository | null>();
+  if (options.githubToken) {
+    const directNames = new Set(
+      graph.directDependencies.map((d) => graph.packages.get(d.id)?.name).filter((n) => n),
+    );
+    const wanted = names
+      .filter((name) => directNames.has(name) || inactiveNames.includes(name))
+      .map((name) => repositoryByName.get(name))
+      .filter((id) => id !== undefined);
+    repositories = await new GitHubClient(
+      http,
+      cache,
+      options.githubToken,
+      () => now,
+    ).getRepositories([...new Set(wanted)]);
+  }
+
   const signals = new Map<string, PackageSignals>();
   for (const node of nodes) {
     const pkg = packages.get(node.name) ?? undefined;
@@ -132,7 +162,13 @@ export async function collectSignals(
       ...optional('tarballSize', size?.tarballSize),
       licenses: details.get(node.id)?.licenses ?? [],
       ...optional('weeklyDownloads', weeklyDownloads.get(node.name)),
-      ...(repositoryId && { repository: repositorySignals(repositoryId, project ?? undefined) }),
+      ...(repositoryId && {
+        repository: repositorySignals(
+          repositoryId,
+          project ?? undefined,
+          repositories.get(repositoryId) ?? undefined,
+        ),
+      }),
     });
   }
   return signals;
@@ -179,7 +215,11 @@ function packageSignals(
   };
 }
 
-function repositorySignals(id: string, project: DepsDevProject | undefined): RepositorySignals {
+function repositorySignals(
+  id: string,
+  project: DepsDevProject | undefined,
+  github?: GitHubRepository,
+): RepositorySignals {
   const maintained = project?.scorecard?.checks.find((check) => check.name === 'Maintained');
   // e.g. "30 commit(s) and 0 issue activity found in the last 90 days -- score normalized to 10"
   const activity = maintained?.reason.match(/(\d+) commit\(s\) and (\d+) issue activity/);
@@ -194,6 +234,12 @@ function repositorySignals(id: string, project: DepsDevProject | undefined): Rep
     ...(activity && {
       commitsLast90Days: Number(activity[1]),
       issueActivityLast90Days: Number(activity[2]),
+    }),
+    ...(github && {
+      archived: github.archived,
+      ...optional('committers', github.committers),
+      ...optional('topCommitterShare', github.topCommitterShare),
+      ...optional('sampledCommits', github.sampledCommits),
     }),
   };
 }

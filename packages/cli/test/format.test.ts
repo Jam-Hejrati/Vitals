@@ -162,3 +162,45 @@ describe('formatReport replacements', () => {
     expect(formatReport(report, { ...plain, all: true })).toContain('instead: day.js, date-fns');
   });
 });
+
+describe('formatReport GitHub notices', () => {
+  const lockfile = JSON.stringify({
+    name: 'app',
+    version: '1.0.0',
+    lockfileVersion: 3,
+    packages: {
+      '': { name: 'app', version: '1.0.0', dependencies: { solo: '1', gone: '1', team: '1' } },
+      'node_modules/solo': { version: '1.0.0' },
+      'node_modules/gone': { version: '1.0.0' },
+      'node_modules/team': { version: '1.0.0' },
+    },
+  });
+  const repo = (extra: object) => ({ id: 'github.com/o/r', ...extra });
+  const report = buildReport(
+    { lockfile: '/app/package-lock.json', kind: 'npm', graph: parseNpmLockfile(lockfile) },
+    new Map(
+      [
+        signal('solo', {
+          repository: repo({ commitsLast90Days: 5, topCommitterShare: 1, sampledCommits: 30 }),
+        }),
+        signal('gone', { repository: repo({ archived: true }) }),
+        signal('team', {
+          repository: repo({ commitsLast90Days: 5, topCommitterShare: 0.4, sampledCommits: 30 }),
+        }),
+      ].map((s) => [s.id, s]),
+    ),
+    { now },
+  );
+
+  it('lists healthy direct dependencies that are archived or have a single maintainer', () => {
+    const text = formatReport(report, { ...plain, github: true });
+    expect(text).toContain('Archived repositories (no further fixes expected):\n  gone');
+    expect(text).toContain('Maintained by one person (direct dependencies):\n  solo');
+    expect(text).not.toContain('team,');
+    expect(text).not.toContain('Tip:');
+  });
+
+  it('tells users without a token how to get these checks', () => {
+    expect(formatReport(report, { ...plain, github: false })).toContain('Tip: set GITHUB_TOKEN');
+  });
+});

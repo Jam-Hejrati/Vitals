@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FileCache, HttpClient, HttpError, MemoryCache } from '../src/index.js';
+import { GitHubClient } from '../src/sources/github.js';
 import { DepsDevClient } from '../src/sources/depsdev.js';
 import { NpmDownloadsClient } from '../src/sources/npm-downloads.js';
 import { NpmRegistryClient } from '../src/sources/npm-registry.js';
@@ -218,5 +219,66 @@ describe('NpmDownloadsClient', () => {
     });
     const client = new NpmDownloadsClient(http(fetch), new MemoryCache());
     expect((await client.getWeeklyDownloads(['a'])).get('a')).toBe(5);
+  });
+});
+
+describe('GitHubClient', () => {
+  const commit = (login: string, type = 'User') => ({ author: { login, type } });
+  const client = (fetch: ReturnType<typeof fakeFetch>) =>
+    new GitHubClient(http(fetch), new MemoryCache(), 'token', () =>
+      Date.parse('2026-10-20T00:00:00Z'),
+    );
+
+  it('reports archived repositories and who actually commits, ignoring bots', async () => {
+    const fetch = fakeFetch({
+      'https://api.github.com/repos/o/dead': () => ({ archived: true }),
+      'https://api.github.com/repos/o/solo/commits': () => [
+        ...Array.from({ length: 9 }, () => commit('alice')),
+        commit('bob'),
+        commit('dependabot[bot]', 'Bot'),
+        commit('renovate', 'Bot'),
+      ],
+      'https://api.github.com/repos/o/solo': () => ({ archived: false }),
+    });
+    const repositories = await client(fetch).getRepositories([
+      'github.com/o/dead',
+      'github.com/o/solo',
+      'gitlab.com/o/elsewhere',
+    ]);
+
+    expect(Object.fromEntries(repositories)).toEqual({
+      'github.com/o/dead': { archived: true },
+      'github.com/o/solo': {
+        archived: false,
+        committers: 2,
+        topCommitterShare: 0.9,
+        sampledCommits: 10,
+      },
+    });
+    // Archived repositories need no commit history, and other hosts are not asked about.
+    expect(fetch.requests.map((r) => r.url.split('?')[0])).not.toContain(
+      'https://api.github.com/repos/o/dead/commits',
+    );
+    expect(fetch.requests.some((r) => r.url.includes('gitlab'))).toBe(false);
+  });
+
+  it('stops asking and reports the rest as unknown when rate limited', async () => {
+    const fetch = fakeFetch({
+      'https://api.github.com/': () => new Response('', { status: 403 }),
+    });
+    const repositories = await client(fetch).getRepositories(
+      Array.from({ length: 30 }, (_, i) => `github.com/o/r${i}`),
+    );
+    expect([...repositories.values()].every((value) => value === null)).toBe(true);
+    expect(fetch.requests.length).toBeLessThan(30);
+  });
+
+  it('reports an invalid token as an error', async () => {
+    const fetch = fakeFetch({
+      'https://api.github.com/': () => new Response('', { status: 401 }),
+    });
+    await expect(client(fetch).getRepositories(['github.com/o/r'])).rejects.toThrow(
+      /rejected the token/,
+    );
   });
 });
