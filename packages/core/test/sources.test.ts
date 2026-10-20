@@ -168,6 +168,21 @@ describe('NpmRegistryClient', () => {
   });
 });
 
+describe('NpmRegistryClient failures', () => {
+  it('reports a size as unknown, without caching it, when the lookup fails', async () => {
+    let down = true;
+    const fetch = fakeFetch({
+      'https://registry.npmjs.org/flaky/latest': () =>
+        down ? new Response('', { status: 503 }) : { dist: { unpackedSize: 10 } },
+    });
+    const client = new NpmRegistryClient(http(fetch), new MemoryCache());
+
+    expect((await client.getLatestSizes(['flaky'])).get('flaky')).toBeNull();
+    down = false;
+    expect((await client.getLatestSizes(['flaky'])).get('flaky')).toEqual({ unpackedSize: 10 });
+  });
+});
+
 describe('NpmDownloadsClient', () => {
   it('uses bulk requests for unscoped names and single requests otherwise', async () => {
     const fetch = fakeFetch({

@@ -24,6 +24,11 @@ export interface PackageReport extends Assessment {
   dev: boolean;
   /** Why it is installed: chains from a direct dependency to this package (shortest first). */
   paths: string[][];
+  /**
+   * Every direct dependency that brings this package in (ids). Removing or replacing the package
+   * only helps when this is the single entry, or when all of them go.
+   */
+  introducedBy: string[];
 }
 
 export interface Report {
@@ -76,15 +81,15 @@ export function buildReport(
   for (const entry of signals.values()) {
     const assessment = assess(entry, options);
     verdicts[assessment.verdict]++;
+    const chains = findDependencyPaths(graph, entry.id).filter((path) => path.length > 1);
     packages.push({
       ...assessment,
       name: entry.name,
       version: entry.version,
       direct: direct.has(entry.id),
       dev: graph.packages.get(entry.id)?.dev ?? false,
-      paths: findDependencyPaths(graph, entry.id)
-        .filter((path) => path.length > 1)
-        .slice(0, MAX_PATHS),
+      paths: chains.slice(0, MAX_PATHS),
+      introducedBy: chains.map((chain) => chain[0]!),
     });
   }
   packages.sort(byUrgency);

@@ -80,10 +80,12 @@ describe('buildReport', () => {
       direct: false,
       dev: true,
       paths: [['a@1.0.0', 'x@1.0.0', 'target@1.0.0']],
+      introducedBy: ['a@1.0.0'],
     });
     expect(report.packages.find((p) => p.id === 'b@1.0.0')).toMatchObject({
       direct: true,
       paths: [],
+      introducedBy: [],
     });
   });
 

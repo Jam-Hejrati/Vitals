@@ -139,4 +139,19 @@ describe('findDependencyPaths', () => {
   it('returns nothing for unknown packages', () => {
     expect(findDependencyPaths(graph, 'nope@1.0.0')).toEqual([]);
   });
+
+  it('does not look past a direct dependency', () => {
+    // `a` is direct and depends on `b`, which is also direct: `b` explains `leaf`, `a` does not.
+    const nested = parseNpmLockfile(
+      lock({
+        '': { dependencies: { a: '1', b: '1' } },
+        'node_modules/a': { version: '1.0.0', dependencies: { b: '1' } },
+        'node_modules/b': { version: '1.0.0', dependencies: { leaf: '1' } },
+        'node_modules/leaf': { version: '1.0.0' },
+      }),
+    );
+    expect(findDependencyPaths(nested, 'leaf@1.0.0')).toEqual([['b@1.0.0', 'leaf@1.0.0']]);
+    // A direct dependency can still be pulled in by another direct dependency.
+    expect(findDependencyPaths(nested, 'b@1.0.0')).toEqual([['b@1.0.0'], ['a@1.0.0', 'b@1.0.0']]);
+  });
 });
