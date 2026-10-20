@@ -160,7 +160,10 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 - [x] Dependency paths ("why is this here?")
 - [x] Terminal report + `--json`
 - [x] `--ci` diff mode
-- [ ] README with demo GIF, publish to npm
+- [x] README
+- [x] Packaging: one self-contained file, checked by `pnpm release:check`
+- [ ] Demo GIF for the README
+- [ ] Publish to npm (needs the package name decided and an npm login)
 
 ### Phase 2 — Adoption
 
