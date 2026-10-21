@@ -49,6 +49,9 @@ export {
 } from './scoring.js';
 export {
   collectSignals,
+  STAGES,
+  type Progress,
+  type Stage,
   type CollectSignalsOptions,
   type PackageSignals,
   type RepositorySignals,

@@ -1,5 +1,5 @@
 import { cached, type Cache } from './cache.js';
-import { mapLimit } from './concurrency.js';
+import { mapLimit, progressOf, type OnProgress } from './concurrency.js';
 import type { HttpClient } from './http.js';
 
 const BASE_URL = 'https://registry.npmjs.org';
@@ -32,34 +32,43 @@ export class NpmRegistryClient {
    * Size of each package's latest version. The registry serves single versions of scoped packages
    * only by dist-tag, so `latest` is what every package gets.
    */
-  getLatestSizes(names: string[]): Promise<Map<string, NpmPackageSize | null>> {
+  getLatestSizes(
+    names: string[],
+    onProgress?: OnProgress,
+  ): Promise<Map<string, NpmPackageSize | null>> {
     return cached(
       this.cache,
       'npm-latest-size',
       names,
       async (missing) => {
-        const sizes = await mapLimit(missing, CONCURRENCY, async (name) => {
-          try {
-            const dist = (
-              await this.http.getJson<Manifest>(`${BASE_URL}/${name.replace('/', '%2F')}/latest`)
-            )?.dist;
-            if (!dist) return undefined;
-            const tarballSize =
-              dist.unpackedSize === undefined && dist.tarball
-                ? await this.http.getSize(dist.tarball)
-                : undefined;
-            const size: NpmPackageSize = {
-              ...(dist.unpackedSize !== undefined && { unpackedSize: dist.unpackedSize }),
-              ...(dist.fileCount !== undefined && { fileCount: dist.fileCount }),
-              ...(tarballSize !== undefined && { tarballSize }),
-            };
-            return [name, size] as const;
-          } catch {
-            // A failed lookup leaves the size unknown (and is retried next run) instead of
-            // failing the whole analysis.
-            return [name, undefined] as const;
-          }
-        });
+        const onEach = progressOf(names, missing, onProgress);
+        const sizes = await mapLimit(
+          missing,
+          CONCURRENCY,
+          async (name) => {
+            try {
+              const dist = (
+                await this.http.getJson<Manifest>(`${BASE_URL}/${name.replace('/', '%2F')}/latest`)
+              )?.dist;
+              if (!dist) return undefined;
+              const tarballSize =
+                dist.unpackedSize === undefined && dist.tarball
+                  ? await this.http.getSize(dist.tarball)
+                  : undefined;
+              const size: NpmPackageSize = {
+                ...(dist.unpackedSize !== undefined && { unpackedSize: dist.unpackedSize }),
+                ...(dist.fileCount !== undefined && { fileCount: dist.fileCount }),
+                ...(tarballSize !== undefined && { tarballSize }),
+              };
+              return [name, size] as const;
+            } catch {
+              // A failed lookup leaves the size unknown (and is retried next run) instead of
+              // failing the whole analysis.
+              return [name, undefined] as const;
+            }
+          },
+          onEach,
+        );
         return new Map(sizes.filter((entry) => entry !== undefined));
       },
       // Only inactive packages are looked up, and their latest version rarely changes.

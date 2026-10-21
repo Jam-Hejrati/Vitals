@@ -13,10 +13,13 @@ import {
   parseLockfile,
   type CiResult,
   type FailLevel,
+  type Progress,
+  type Report,
 } from '@vitals/core';
 import { UsageError } from './errors.js';
-import { formatCi, formatReport } from './format.js';
+import { formatCi, formatReport, supportsLinks } from './format.js';
 import { readFileAtRef } from './git.js';
+import { ProgressLine } from './progress.js';
 
 const HELP = `Usage: vitals [directory] [options]
 
@@ -92,16 +95,27 @@ async function main(): Promise<number> {
       content === undefined ? new Set() : packageNames(parseLockfile(project.kind, content));
   }
 
-  const interactive = process.stderr.isTTY && !values.json;
-  if (interactive) process.stderr.write('Checking dependencies…');
   const githubToken = values['no-github']
     ? undefined
     : (process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN);
-  const report = await analyzeProject(project, {
-    production: values.prod === true,
-    ...(githubToken && { githubToken }),
-  });
-  if (interactive) process.stderr.write('\r\x1b[K');
+  const noColor = values['no-color'] === true || Boolean(process.env.NO_COLOR);
+  const progress =
+    process.stderr.isTTY && !values.json
+      ? new ProgressLine(process.stderr, { github: githubToken !== undefined, color: !noColor })
+      : undefined;
+  const started = performance.now();
+  progress?.start();
+  let report: Report;
+  try {
+    report = await analyzeProject(project, {
+      production: values.prod === true,
+      ...(githubToken && { githubToken }),
+      ...(progress && { onProgress: (p: Progress) => progress.update(p) }),
+    });
+  } finally {
+    progress?.stop();
+  }
+  const durationMs = performance.now() - started;
 
   const ci = values.ci
     ? evaluateCi(report, { failOn, ...(baseNames && baseRef && { base: baseRef, baseNames }) })
@@ -111,8 +125,14 @@ async function main(): Promise<number> {
     const output = ci ? { ...report, ci: ciSummary(ci) } : report;
     process.stdout.write(JSON.stringify(output, null, 2) + '\n');
   } else {
-    const color = !values['no-color'] && !process.env.NO_COLOR && process.stdout.isTTY === true;
-    const options = { all: values.all === true, color, github: githubToken !== undefined };
+    const color = !noColor && process.stdout.isTTY === true;
+    const options = {
+      all: values.all === true,
+      color,
+      links: color && supportsLinks(process.env),
+      github: githubToken !== undefined,
+      durationMs,
+    };
     process.stdout.write(ci ? formatCi(report, ci, options) : formatReport(report, options));
   }
   return ci && !ci.passed ? 1 : 0;
