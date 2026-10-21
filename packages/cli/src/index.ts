@@ -22,8 +22,14 @@ const HELP = `Usage: vitals [directory] [options]
 
 Check whether a project's dependencies are alive, finished, or dying.
 
-With a GITHUB_TOKEN (or GH_TOKEN) in the environment, Vitals also checks archived
-repositories and finds dependencies that are maintained by a single person.
+GitHub token (optional): with GITHUB_TOKEN (or GH_TOKEN) set in the environment, Vitals also
+checks archived repositories and finds dependencies maintained by a single person.
+  Create one at https://github.com/settings/personal-access-tokens/new (public repositories,
+  read-only, no permissions), then set it before running vitals:
+    PowerShell:   $env:GITHUB_TOKEN = "your-token"
+    bash / zsh:   export GITHUB_TOKEN=your-token
+  The token is read from the environment only, never from a flag, so it stays out of your
+  shell history.
 
 Options:
   --all          List healthy packages too, not just the ones that need attention

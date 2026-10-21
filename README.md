@@ -115,7 +115,33 @@ package on GitHub:
 - **Single maintainers**: one person wrote almost all recent commits (bots are ignored; npm's own
   "maintainers" list is not used because it says who can publish, not who works on the code).
 
-A token with no scopes is enough (public data). Without one, everything else works unchanged.
+Without a token, everything else works unchanged.
+
+### Getting and setting a token
+
+1. Create a token at <https://github.com/settings/personal-access-tokens/new>: choose **Public
+   repositories (read-only)** and grant no permissions. Vitals only reads public data. (A classic
+   token with no scopes also works.) If you use the GitHub CLI, `gh auth token` prints one.
+2. Put it in the environment before running Vitals:
+
+   ```powershell
+   # Windows PowerShell: this terminal only
+   $env:GITHUB_TOKEN = "your-token"
+   # ...or for every new terminal
+   setx GITHUB_TOKEN "your-token"
+   ```
+
+   ```bash
+   # macOS / Linux
+   export GITHUB_TOKEN=your-token
+   ```
+
+3. Run `vitals` as usual. The report no longer ends with the "set GITHUB_TOKEN" tip.
+
+The token is read only from the environment (`GITHUB_TOKEN`, or `GH_TOKEN` as the GitHub CLI uses),
+never from a command-line flag, so it does not end up in your shell history. In GitHub Actions the
+built-in `secrets.GITHUB_TOKEN` is enough (see the workflow above). Use `--no-github` to skip GitHub
+even when a token is set.
 
 ## Where the data comes from
 

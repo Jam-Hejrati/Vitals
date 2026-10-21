@@ -106,7 +106,7 @@ export function formatReport(report: Report, options: FormatOptions): string {
     lines.push(
       paint(
         'gray',
-        'Tip: set GITHUB_TOKEN to also check archived repositories and single-maintainer packages.',
+        'Tip: set GITHUB_TOKEN to also check archived repositories and single-maintainer packages (see --help).',
       ),
     );
   }
