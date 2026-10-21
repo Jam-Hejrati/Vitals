@@ -1,6 +1,6 @@
 {
   "name": "dependency-vitals",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Find out whether your dependencies are alive, finished, or dying: maintenance health, not just versions or vulnerabilities.",
   "keywords": [
     "dependencies",
