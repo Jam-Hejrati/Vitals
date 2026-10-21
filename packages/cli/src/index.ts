@@ -1,14 +1,19 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { LockfileError, loadProject } from '@vitals/core';
+import { analyzeProject, LockfileError, loadProject } from '@vitals/core';
+import { formatReport } from './format.js';
 
 const HELP = `Usage: vitals [directory] [options]
 
-Check the maintenance health of a project's dependencies.
+Check whether a project's dependencies are alive, finished, or dying.
 
 Options:
+  --all          List healthy packages too, not just the ones that need attention
+  --prod         Ignore packages that are only used for development
+  --json         Print the full report as JSON
+  --no-color     Disable colors (also set by NO_COLOR)
   -h, --help     Show this help
   -v, --version  Show the version
 `;
@@ -17,6 +22,10 @@ async function main(): Promise<number> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
+      all: { type: 'boolean' },
+      prod: { type: 'boolean' },
+      json: { type: 'boolean' },
+      'no-color': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -32,16 +41,19 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const { lockfile, graph } = await loadProject(resolve(positionals[0] ?? '.'));
-  const external = [...graph.packages.values()].filter((pkg) => !pkg.local);
-  const direct = new Set(
-    graph.directDependencies.map((d) => d.id).filter((id) => !graph.packages.get(id)?.local),
-  );
-  process.stdout.write(
-    `${graph.root.name} (${relative(process.cwd(), lockfile) || lockfile}): ` +
-      `${direct.size} direct, ${external.length} total packages.\n` +
-      'Health scoring is not implemented yet.\n',
-  );
+  const project = await loadProject(resolve(positionals[0] ?? '.'));
+
+  const interactive = process.stderr.isTTY && !values.json;
+  if (interactive) process.stderr.write('Checking dependencies…');
+  const report = await analyzeProject(project, { production: values.prod === true });
+  if (interactive) process.stderr.write('\r\x1b[K');
+
+  if (values.json) {
+    process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+    return 0;
+  }
+  const color = !values['no-color'] && !process.env.NO_COLOR && process.stdout.isTTY === true;
+  process.stdout.write(formatReport(report, { all: values.all === true, color }));
   return 0;
 }
 

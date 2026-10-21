@@ -85,8 +85,8 @@ describe('collectSignals', () => {
     });
 
     expect([...signals.keys()]).toEqual(['old@1.0.0']);
-    // Released within the year, so its size does not matter and is not fetched.
-    expect(fetch.requests.some((r) => r.url.startsWith('https://registry.npmjs.org/'))).toBe(false);
+    // Released within the year, so neither its size nor its downloads matter: not fetched.
+    expect(fetch.requests.some((r) => /npmjs\.(org|com)\//.test(r.url))).toBe(false);
     expect(signals.get('old@1.0.0')).toEqual({
       id: 'old@1.0.0',
       name: 'old',
@@ -102,7 +102,6 @@ describe('collectSignals', () => {
       stableReleasesLastYear: 1,
       dependencyCount: 0,
       licenses: ['ISC'],
-      weeklyDownloads: 1234,
       repository: {
         id: 'github.com/o/old-v2',
         openIssues: 12,
@@ -135,22 +134,69 @@ describe('collectSignals', () => {
     });
   });
 
-  it('fetches the latest size of packages without a release in the last year', async () => {
-    const fetch = fakeFetch({
-      ...routes,
+  describe('inactive packages', () => {
+    const inactive = new Date('2028-01-01T00:00:00Z');
+    const sizeAndDownloads = {
       'https://registry.npmjs.org/old/latest': () => ({
         dist: { unpackedSize: 4096, fileCount: 3 },
       }),
+      'https://api.npmjs.org/downloads/point/last-week/old': () => ({ downloads: 1234 }),
+    };
+    const projectWithCommits = (commits: number) => () => ({
+      responses: [
+        {
+          request: { projectKey: { id: 'github.com/o/old-v2' } },
+          project: {
+            openIssuesCount: 12,
+            scorecard: {
+              date: '2026-08-24T00:00:00Z',
+              overallScore: 4.2,
+              checks: [
+                {
+                  name: 'Maintained',
+                  score: 0,
+                  reason: `${commits} commit(s) and 0 issue activity found in the last 90 days`,
+                },
+              ],
+            },
+          },
+        },
+      ],
     });
-    const signals = await collectSignals(graph, {
-      http: new HttpClient({ fetch, retryDelayMs: 0 }),
-      cache: new MemoryCache(),
-      now: new Date('2028-01-01T00:00:00Z'),
+
+    it('fetches size and downloads when there is no recent release or commit', async () => {
+      const fetch = fakeFetch({
+        ...routes,
+        ...sizeAndDownloads,
+        'https://api.deps.dev/v3alpha/projectbatch': projectWithCommits(0),
+      });
+      const signals = await collectSignals(graph, {
+        http: new HttpClient({ fetch, retryDelayMs: 0 }),
+        cache: new MemoryCache(),
+        now: inactive,
+      });
+      expect(signals.get('old@1.0.0')).toMatchObject({
+        releasesLastYear: 0,
+        unpackedSize: 4096,
+        fileCount: 3,
+        weeklyDownloads: 1234,
+      });
     });
-    expect(signals.get('old@1.0.0')).toMatchObject({
-      releasesLastYear: 0,
-      unpackedSize: 4096,
-      fileCount: 3,
+
+    it('skips them when the repository has recent commits', async () => {
+      const fetch = fakeFetch({
+        ...routes,
+        ...sizeAndDownloads,
+        'https://api.deps.dev/v3alpha/projectbatch': projectWithCommits(5),
+      });
+      const signals = await collectSignals(graph, {
+        http: new HttpClient({ fetch, retryDelayMs: 0 }),
+        cache: new MemoryCache(),
+        now: inactive,
+      });
+      expect(signals.get('old@1.0.0')?.unpackedSize).toBeUndefined();
+      expect(signals.get('old@1.0.0')?.weeklyDownloads).toBeUndefined();
+      expect(fetch.requests.some((r) => /npmjs\.(org|com)\//.test(r.url))).toBe(false);
     });
   });
 });

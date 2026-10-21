@@ -27,14 +27,15 @@ export interface PackageSignals {
   /** Installed dependencies of this package. */
   dependencyCount: number;
   /**
-   * Size of the latest version. Only looked up for packages without a release in the last year,
-   * the only ones whose verdict depends on it.
+   * Size of the latest version. Only looked up for inactive packages (no release in the last year
+   * and no recent commits), the only ones whose verdict depends on it.
    */
   unpackedSize?: number;
   fileCount?: number;
   /** Compressed size, when the registry did not record `unpackedSize` (versions before ~2018). */
   tarballSize?: number;
   licenses: string[];
+  /** Only looked up for inactive packages, like the size above. */
   weeklyDownloads?: number;
   repository?: RepositorySignals;
 }
@@ -79,10 +80,7 @@ export async function collectSignals(
   );
   const names = [...new Set(nodes.map((node) => node.name))];
 
-  const [packages, weeklyDownloads] = await Promise.all([
-    depsDev.getPackages(names),
-    downloads.getWeeklyDownloads(names),
-  ]);
+  const packages = await depsDev.getPackages(names);
 
   // Licenses come from the installed version; the repository from the latest, as repos move.
   const versionKeys = new Map<string, { name: string; version: string }>();
@@ -101,13 +99,23 @@ export async function collectSignals(
     );
   };
   const repositoryIds = [...new Set(nodes.map(repositoryOf).filter((id) => id !== undefined))];
-  const inactiveNames = names.filter((name) => {
+  const projects = await depsDev.getProjects(repositoryIds);
+
+  // Size and download counts only matter for inactive packages: no release in the last year and
+  // no recent repository commits. Skipping the rest saves most of the requests.
+  const repositoryByName = new Map(nodes.map((node) => [node.name, repositoryOf(node)]));
+  const isInactive = (name: string): boolean => {
     const last = lastPublishedAt(packages.get(name));
-    return last === undefined || now - Date.parse(last) > YEAR_MS;
-  });
-  const [projects, sizes] = await Promise.all([
-    depsDev.getProjects(repositoryIds),
+    if (last !== undefined && now - Date.parse(last) <= YEAR_MS) return false;
+    const repositoryId = repositoryByName.get(name);
+    if (repositoryId === undefined) return true;
+    const commits = repositorySignals(repositoryId, projects.get(repositoryId) ?? undefined);
+    return !((commits.commitsLast90Days ?? 0) > 0);
+  };
+  const inactiveNames = names.filter(isInactive);
+  const [sizes, weeklyDownloads] = await Promise.all([
     registry.getLatestSizes(inactiveNames),
+    downloads.getWeeklyDownloads(inactiveNames),
   ]);
 
   const signals = new Map<string, PackageSignals>();

@@ -30,7 +30,7 @@ export class HttpClient {
 
   constructor(options: HttpClientOptions = {}) {
     this.fetch = options.fetch ?? globalThis.fetch;
-    this.retries = options.retries ?? 3;
+    this.retries = options.retries ?? 4;
     this.retryDelayMs = options.retryDelayMs ?? 500;
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.userAgent = options.userAgent ?? 'vitals (dependency health checker)';

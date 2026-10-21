@@ -50,7 +50,8 @@ export function reachableFrom(graph: DependencyGraph, startIds: Iterable<string>
  * Answers "why is this here?": the dependency chains from direct dependencies down to `targetId`.
  *
  * Returns the shortest chain for each direct dependency that leads to the target, shortest first.
- * Each chain starts with a direct dependency and ends with the target.
+ * Each chain starts with a direct dependency and ends with the target; chains do not pass through
+ * other direct dependencies.
  */
 export function findDependencyPaths(graph: DependencyGraph, targetId: string): string[][] {
   if (!graph.packages.has(targetId)) return [];
@@ -76,6 +77,9 @@ export function findDependencyPaths(graph: DependencyGraph, targetId: string): s
       const path: string[] = [];
       for (let hop: string | null = id; hop !== null; hop = next.get(hop) ?? null) path.push(hop);
       paths.push(path);
+      // A direct dependency stays installed whatever depends on it, so nothing above it explains
+      // why the target is here. (The target itself may still be pulled in by other packages.)
+      if (id !== targetId) continue;
     }
     for (const parent of dependents.get(id) ?? []) {
       if (!next.has(parent)) {

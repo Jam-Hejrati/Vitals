@@ -168,6 +168,21 @@ describe('NpmRegistryClient', () => {
   });
 });
 
+describe('NpmRegistryClient failures', () => {
+  it('reports a size as unknown, without caching it, when the lookup fails', async () => {
+    let down = true;
+    const fetch = fakeFetch({
+      'https://registry.npmjs.org/flaky/latest': () =>
+        down ? new Response('', { status: 503 }) : { dist: { unpackedSize: 10 } },
+    });
+    const client = new NpmRegistryClient(http(fetch), new MemoryCache());
+
+    expect((await client.getLatestSizes(['flaky'])).get('flaky')).toBeNull();
+    down = false;
+    expect((await client.getLatestSizes(['flaky'])).get('flaky')).toEqual({ unpackedSize: 10 });
+  });
+});
+
 describe('NpmDownloadsClient', () => {
   it('uses bulk requests for unscoped names and single requests otherwise', async () => {
     const fetch = fakeFetch({
@@ -182,6 +197,19 @@ describe('NpmDownloadsClient', () => {
     const downloads = await client.getWeeklyDownloads(['a', 'b', '@s/c']);
     expect(Object.fromEntries(downloads)).toEqual({ a: 10, b: null, '@s/c': 30 });
     expect(fetch.requests).toHaveLength(2);
+  });
+
+  it('survives rate limiting and retries the failed names on the next run', async () => {
+    let limited = true;
+    const fetch = fakeFetch({
+      'https://api.npmjs.org/downloads/point/last-week/': () =>
+        limited ? new Response('', { status: 429 }) : { downloads: 7 },
+    });
+    const client = new NpmDownloadsClient(http(fetch), new MemoryCache());
+
+    expect((await client.getWeeklyDownloads(['@s/c'])).get('@s/c')).toBeNull();
+    limited = false;
+    expect((await client.getWeeklyDownloads(['@s/c'])).get('@s/c')).toBe(7);
   });
 
   it('asks for a lone unscoped name in the single-package format', async () => {

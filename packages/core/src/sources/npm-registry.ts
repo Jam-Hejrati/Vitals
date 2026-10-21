@@ -17,7 +17,11 @@ interface Manifest {
   dist?: { unpackedSize?: number; fileCount?: number; tarball?: string };
 }
 
-/** The npm registry (https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md). */
+/**
+ * The npm registry (https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md).
+ *
+ * Sizes are a refinement, not a requirement: when a lookup fails the size is reported as unknown.
+ */
 export class NpmRegistryClient {
   constructor(
     private readonly http: HttpClient,
@@ -35,20 +39,26 @@ export class NpmRegistryClient {
       names,
       async (missing) => {
         const sizes = await mapLimit(missing, CONCURRENCY, async (name) => {
-          const dist = (
-            await this.http.getJson<Manifest>(`${BASE_URL}/${name.replace('/', '%2F')}/latest`)
-          )?.dist;
-          if (!dist) return undefined;
-          const tarballSize =
-            dist.unpackedSize === undefined && dist.tarball
-              ? await this.http.getSize(dist.tarball)
-              : undefined;
-          const size: NpmPackageSize = {
-            ...(dist.unpackedSize !== undefined && { unpackedSize: dist.unpackedSize }),
-            ...(dist.fileCount !== undefined && { fileCount: dist.fileCount }),
-            ...(tarballSize !== undefined && { tarballSize }),
-          };
-          return [name, size] as const;
+          try {
+            const dist = (
+              await this.http.getJson<Manifest>(`${BASE_URL}/${name.replace('/', '%2F')}/latest`)
+            )?.dist;
+            if (!dist) return undefined;
+            const tarballSize =
+              dist.unpackedSize === undefined && dist.tarball
+                ? await this.http.getSize(dist.tarball)
+                : undefined;
+            const size: NpmPackageSize = {
+              ...(dist.unpackedSize !== undefined && { unpackedSize: dist.unpackedSize }),
+              ...(dist.fileCount !== undefined && { fileCount: dist.fileCount }),
+              ...(tarballSize !== undefined && { tarballSize }),
+            };
+            return [name, size] as const;
+          } catch {
+            // A failed lookup leaves the size unknown (and is retried next run) instead of
+            // failing the whole analysis.
+            return [name, undefined] as const;
+          }
         });
         return new Map(sizes.filter((entry) => entry !== undefined));
       },
