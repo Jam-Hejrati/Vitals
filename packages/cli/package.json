@@ -26,7 +26,7 @@
   },
   "type": "module",
   "bin": {
-    "vitals": "./dist/vitals.js"
+    "vitals": "dist/vitals.js"
   },
   "files": [
     "dist/vitals.js"
