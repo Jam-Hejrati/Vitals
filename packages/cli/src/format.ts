@@ -1,9 +1,11 @@
-import type { PackageReport, Report, Verdict } from '@vitals/core';
+import type { CiResult, FailLevel, PackageReport, Report, Suggestion, Verdict } from '@vitals/core';
 
 export interface FormatOptions {
   /** List healthy packages too, and every nested problem instead of the first few. */
   all: boolean;
   color: boolean;
+  /** Whether GitHub data was used. When explicitly false, the report mentions how to enable it. */
+  github?: boolean;
 }
 
 type Problem = 'deprecated' | 'abandoned' | 'stale';
@@ -14,6 +16,8 @@ const PROBLEM_ORDER: Record<Problem, number> = { deprecated: 0, abandoned: 1, st
 const MAX_NESTED = 5;
 const MAX_SHARED = 8;
 const DETAIL_WIDTH = 100;
+const MAX_SUGGESTIONS = 3;
+const MAX_SUGGESTIONS_INLINE = 2;
 
 const STYLES = { red: 31, yellow: 33, green: 32, gray: 90, bold: 1 } as const;
 type Style = keyof typeof STYLES;
@@ -36,11 +40,14 @@ interface Group {
   children: PackageReport[];
 }
 
+function createPaint(options: FormatOptions): Paint {
+  return (style, text) => (options.color ? `\x1b[${STYLES[style]}m${text}\x1b[0m` : text);
+}
+
 export function formatReport(report: Report, options: FormatOptions): string {
-  const paint: Paint = (style, text) =>
-    options.color ? `\x1b[${STYLES[style]}m${text}\x1b[0m` : text;
+  const paint = createPaint(options);
   const { summary } = report;
-  const { groups, shared } = groupProblems(report);
+  const { groups, shared } = groupProblems(report.packages, report.packages.filter(isProblem));
   const displayed = new Set<string>();
   const lines: string[] = [];
 
@@ -56,18 +63,11 @@ export function formatReport(report: Report, options: FormatOptions): string {
     for (const child of visible(group.children, MAX_NESTED, options)) displayed.add(child.id);
   }
 
-  if (shared.length > 0) {
-    lines.push(paint('bold', 'Shared by several dependencies (all of them need to change):'));
-    const shown = visible(shared, MAX_SHARED, options);
-    for (const pkg of shown) {
-      lines.push(`  ${oneLine(pkg, paint)}${paint('gray', `  via ${viaNames(pkg)}`)}`);
-      displayed.add(pkg.id);
-    }
-    if (shown.length < shared.length) {
-      lines.push(paint('gray', `  …and ${shared.length - shown.length} more (use --all)`));
-    }
-    lines.push('');
-  }
+  const sharedSection = formatShared(shared, options, paint);
+  lines.push(...sharedSection.lines);
+  for (const pkg of sharedSection.shown) displayed.add(pkg.id);
+
+  lines.push(...formatNotices(report, paint));
 
   if (groups.length === 0 && shared.length === 0) {
     lines.push(paint('green', '✔ No dependency needs attention.'), '');
@@ -102,6 +102,55 @@ export function formatReport(report: Report, options: FormatOptions): string {
       );
     }
   }
+  if (options.github === false) {
+    lines.push(
+      paint(
+        'gray',
+        'Tip: set GITHUB_TOKEN to also check archived repositories and single-maintainer packages (see --help).',
+      ),
+    );
+  }
+  return lines.join('\n') + '\n';
+}
+
+const FAIL_CRITERIA: Record<FailLevel, string> = {
+  deprecated: 'deprecated',
+  abandoned: 'deprecated or abandoned',
+  stale: 'deprecated, abandoned or stale',
+};
+
+/** The result of `--ci`: only what the check is about, and whether it passed. */
+export function formatCi(report: Report, ci: CiResult, options: FormatOptions): string {
+  const paint = createPaint(options);
+  const lines = [
+    `${paint('bold', 'Vitals CI')} · ${report.project.name} · ${report.project.lockfile}`,
+    ci.base === undefined
+      ? `No base given: checking all ${plural(ci.newPackages, 'package')}`
+      : `Compared with ${ci.base}: ${plural(ci.newPackages, 'new package')}`,
+    '',
+  ];
+
+  const { groups, shared } = groupProblems(report.packages, ci.offenders);
+  for (const group of groups) lines.push(...formatGroup(group, options, paint), '');
+  lines.push(...formatShared(shared, options, paint).lines);
+  if (ci.watch.length > 0) {
+    lines.push(paint('bold', 'Worth a look (not failing the check):'));
+    for (const pkg of ci.watch) lines.push(`  ${oneLine(pkg, paint)}`);
+    lines.push('');
+  }
+
+  const scope = ci.base === undefined ? '' : 'new ';
+  const count = ci.offenders.length;
+  const noun = `${scope}${count === 1 ? 'dependency' : 'dependencies'}`;
+  lines.push(
+    ci.passed
+      ? paint('green', `✔ Passed: no ${scope}dependency is ${FAIL_CRITERIA[ci.failOn]}.`)
+      : paint(
+          'red',
+          `✖ Failed: ${count} ${noun} ${count === 1 ? 'is' : 'are'} ${FAIL_CRITERIA[ci.failOn]} ` +
+            `(--fail-on ${ci.failOn}).`,
+        ),
+  );
   return lines.join('\n') + '\n';
 }
 
@@ -110,8 +159,11 @@ export function formatReport(report: Report, options: FormatOptions): string {
  * direct dependency only when that is the single dependency bringing it in, so replacing it
  * really makes the problem go away; the others are listed separately.
  */
-function groupProblems(report: Report): { groups: Group[]; shared: PackageReport[] } {
-  const byId = new Map(report.packages.map((pkg) => [pkg.id, pkg]));
+function groupProblems(
+  all: PackageReport[],
+  problems: PackageReport[],
+): { groups: Group[]; shared: PackageReport[] } {
+  const byId = new Map(all.map((pkg) => [pkg.id, pkg]));
   const groups = new Map<string, Group>();
   const groupFor = (id: string): Group => {
     let group = groups.get(id);
@@ -123,8 +175,7 @@ function groupProblems(report: Report): { groups: Group[]; shared: PackageReport
   };
 
   const shared: PackageReport[] = [];
-  for (const pkg of report.packages) {
-    if (!isProblem(pkg)) continue;
+  for (const pkg of problems) {
     if (pkg.direct) groupFor(pkg.id);
     else if (pkg.introducedBy.length === 1) groupFor(pkg.introducedBy[0]!).children.push(pkg);
     else shared.push(pkg);
@@ -139,6 +190,25 @@ function groupProblems(report: Report): { groups: Group[]; shared: PackageReport
       worst(a) - worst(b) || members(b).length - members(a).length || a.id.localeCompare(b.id),
   );
   return { groups: ordered, shared };
+}
+
+/** Problems that several direct dependencies bring in: all of those dependencies have to change. */
+function formatShared(
+  shared: PackageReport[],
+  options: FormatOptions,
+  paint: Paint,
+): { lines: string[]; shown: PackageReport[] } {
+  if (shared.length === 0) return { lines: [], shown: [] };
+  const shown = visible(shared, MAX_SHARED, options);
+  const lines = [paint('bold', 'Shared by several dependencies (all of them need to change):')];
+  for (const pkg of shown) {
+    lines.push(`  ${oneLine(pkg, paint)}${paint('gray', `  via ${viaNames(pkg)}`)}`);
+  }
+  if (shown.length < shared.length) {
+    lines.push(paint('gray', `  …and ${shared.length - shown.length} more (use --all)`));
+  }
+  lines.push('');
+  return { lines, shown };
 }
 
 function formatGroup(group: Group, options: FormatOptions, paint: Paint): string[] {
@@ -175,12 +245,19 @@ function formatGroup(group: Group, options: FormatOptions, paint: Paint): string
 
 function describeProblem(pkg: PackageReport, paint: Paint): string[] {
   const { icon, color } = VERDICT_STYLE[pkg.verdict];
-  const lines = [
-    `${paint(color, icon)}  ${paint('bold', `${pkg.name}@${pkg.version}`)}  ` +
-      `${paint(color, pkg.verdict.toUpperCase())}  ${tags(pkg, paint)}`,
+  const heading = [
+    paint(color, icon),
+    paint('bold', `${pkg.name}@${pkg.version}`),
+    paint(color, pkg.verdict.toUpperCase()),
+    tags(pkg, paint),
   ];
+  const lines = [heading.filter(Boolean).join('  ')];
   for (const reason of pkg.reasons) lines.push(`    · ${reason}`);
+  for (const warning of pkg.warnings) lines.push(paint('yellow', `    ! ${warning.message}`));
   for (const advice of pkg.advice) lines.push(`    → ${advice}`);
+  if (pkg.replacements.length > 0) {
+    lines.push(`    → instead: ${suggestionList(pkg.replacements, MAX_SUGGESTIONS)}`);
+  }
   if (pkg.unknowns.length > 0) {
     lines.push(paint('gray', `    ? could not check: ${pkg.unknowns.join('; ')}`));
   }
@@ -195,11 +272,37 @@ function oneLine(pkg: PackageReport, paint: Paint): string {
     reasons.length > 0
       ? reasons.join(', ')
       : `could not check: ${pkg.unknowns.join('; ') || 'no data'}`;
-  const advice = pkg.advice.length > 0 ? ` → ${pkg.advice.join(', ')}` : '';
+  const advice = [
+    ...pkg.advice,
+    ...(pkg.replacements.length > 0
+      ? [`instead: ${suggestionList(pkg.replacements, MAX_SUGGESTIONS_INLINE)}`]
+      : []),
+  ];
   return (
     `${paint(color, icon)} ${pkg.name}@${pkg.version}  ${paint(color, pkg.verdict)}  ` +
-    `${paint('gray', truncate(detail, DETAIL_WIDTH))}${advice}`
+    `${paint('gray', truncate(detail, DETAIL_WIDTH))}${advice.map((a) => ` → ${a}`).join('')}`
   );
+}
+
+/** Direct dependencies that are healthy, but worth knowing about. Needs GitHub data. */
+function formatNotices(report: Report, paint: Paint): string[] {
+  const lines: string[] = [];
+  const notice = (code: 'single-maintainer' | 'archived', title: string) => {
+    const names = report.packages
+      .filter((p) => p.direct && !isProblem(p) && p.warnings.some((w) => w.code === code))
+      .map((p) => p.name);
+    if (names.length > 0) lines.push(paint('bold', title), `  ${names.join(', ')}`, '');
+  };
+  notice('archived', 'Archived repositories (no further fixes expected):');
+  notice('single-maintainer', 'Maintained by one person (direct dependencies):');
+  return lines;
+}
+
+function suggestionList(suggestions: Suggestion[], max: number): string {
+  return suggestions
+    .slice(0, max)
+    .map((s) => (s.kind === 'native' ? `${s.name} (built in)` : s.name))
+    .join(', ');
 }
 
 function tags(pkg: PackageReport, paint: Paint): string {

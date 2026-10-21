@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 import { findDependencyPaths, type DependencyGraph } from './graph.js';
+import { findReplacements, type Suggestion } from './replacements.js';
 import type { LockfileKind, Project } from './project.js';
 import {
   assess,
@@ -29,6 +30,8 @@ export interface PackageReport extends Assessment {
    * only helps when this is the single entry, or when all of them go.
    */
   introducedBy: string[];
+  /** What the e18e community suggests using instead. Advice only: it never changes the verdict. */
+  replacements: Suggestion[];
 }
 
 export interface Report {
@@ -90,6 +93,7 @@ export function buildReport(
       dev: graph.packages.get(entry.id)?.dev ?? false,
       paths: chains.slice(0, MAX_PATHS),
       introducedBy: chains.map((chain) => chain[0]!),
+      replacements: findReplacements(entry.name),
     });
   }
   packages.sort(byUrgency);

@@ -1,6 +1,12 @@
-import { buildReport, parseNpmLockfile, type PackageSignals } from '@vitals/core';
+import {
+  buildReport,
+  evaluateCi,
+  packageNames,
+  parseNpmLockfile,
+  type PackageSignals,
+} from '@vitals/core';
 import { describe, expect, it } from 'vitest';
-import { formatReport } from '../src/format.js';
+import { formatCi, formatReport } from '../src/format.js';
 
 const now = new Date('2026-10-20T00:00:00Z');
 
@@ -127,5 +133,123 @@ describe('formatReport without problems', () => {
   it('only emits color codes when asked to', () => {
     expect(formatReport(problems, plain)).not.toContain('\x1b[');
     expect(formatReport(problems, { ...plain, color: true })).toContain('\x1b[31m');
+  });
+});
+
+describe('formatReport replacements', () => {
+  const lockfile = JSON.stringify({
+    name: 'app',
+    version: '1.0.0',
+    lockfileVersion: 3,
+    packages: {
+      '': { name: 'app', version: '1.0.0', dependencies: { 'left-pad': '1', moment: '1' } },
+      'node_modules/left-pad': { version: '1.0.0' },
+      'node_modules/moment': { version: '1.0.0' },
+    },
+  });
+  const report = buildReport(
+    { lockfile: '/app/package-lock.json', kind: 'npm', graph: parseNpmLockfile(lockfile) },
+    new Map(
+      [signal('left-pad', { latestDeprecated: 'use padStart' }), signal('moment')].map((s) => [
+        s.id,
+        s,
+      ]),
+    ),
+    { now },
+  );
+
+  it('suggests what to use instead for packages that need attention', () => {
+    const text = formatReport(report, plain);
+    expect(text).toContain('→ instead: String.prototype.padStart (built in)');
+  });
+
+  it('does not nag about healthy packages unless asked for everything', () => {
+    expect(formatReport(report, plain)).not.toContain('date-fns');
+    expect(formatReport(report, { ...plain, all: true })).toContain('instead: day.js, date-fns');
+  });
+});
+
+describe('formatReport GitHub notices', () => {
+  const lockfile = JSON.stringify({
+    name: 'app',
+    version: '1.0.0',
+    lockfileVersion: 3,
+    packages: {
+      '': { name: 'app', version: '1.0.0', dependencies: { solo: '1', gone: '1', team: '1' } },
+      'node_modules/solo': { version: '1.0.0' },
+      'node_modules/gone': { version: '1.0.0' },
+      'node_modules/team': { version: '1.0.0' },
+    },
+  });
+  const repo = (extra: object) => ({ id: 'github.com/o/r', ...extra });
+  const report = buildReport(
+    { lockfile: '/app/package-lock.json', kind: 'npm', graph: parseNpmLockfile(lockfile) },
+    new Map(
+      [
+        signal('solo', {
+          repository: repo({ commitsLast90Days: 5, topCommitterShare: 1, sampledCommits: 30 }),
+        }),
+        signal('gone', { repository: repo({ archived: true }) }),
+        signal('team', {
+          repository: repo({ commitsLast90Days: 5, topCommitterShare: 0.4, sampledCommits: 30 }),
+        }),
+      ].map((s) => [s.id, s]),
+    ),
+    { now },
+  );
+
+  it('lists healthy direct dependencies that are archived or have a single maintainer', () => {
+    const text = formatReport(report, { ...plain, github: true });
+    expect(text).toContain('Archived repositories (no further fixes expected):\n  gone');
+    expect(text).toContain('Maintained by one person (direct dependencies):\n  solo');
+    expect(text).not.toContain('team,');
+    expect(text).not.toContain('Tip:');
+  });
+
+  it('tells users without a token how to get these checks', () => {
+    expect(formatReport(report, { ...plain, github: false })).toContain('Tip: set GITHUB_TOKEN');
+  });
+});
+
+describe('formatCi', () => {
+  const base = new Set(['fine', 'p', 'q']);
+  const failing = evaluateCi(problems, {
+    failOn: 'abandoned',
+    base: 'origin/main',
+    baseNames: base,
+  });
+
+  it('groups what a pull request adds under the dependency that brings it in', () => {
+    const text = formatCi(problems, failing, plain);
+    expect(text).toContain('Compared with origin/main: 10 new packages');
+    expect(text).toContain('old@1.0.0  DEPRECATED  (direct)');
+    expect(text).toContain('Also brings in 1 package that needs attention:');
+    expect(text).toContain('✖ inner@1.0.0  deprecated');
+    expect(text).toContain(
+      '✖ Failed: 2 new dependencies are deprecated or abandoned (--fail-on abandoned).',
+    );
+  });
+
+  it('keeps problems below the threshold out of the failure', () => {
+    const text = formatCi(problems, failing, plain);
+    expect(text).toContain('Worth a look (not failing the check):');
+    expect(text).toContain('c1@1.0.0  stale');
+  });
+
+  it('passes when nothing new is wrong', () => {
+    const passing = evaluateCi(problems, {
+      failOn: 'abandoned',
+      base: 'HEAD',
+      baseNames: packageNames(graph),
+    });
+    const text = formatCi(problems, passing, plain);
+    expect(text).toContain('Compared with HEAD: 0 new packages');
+    expect(text).toContain('✔ Passed: no new dependency is deprecated or abandoned.');
+  });
+
+  it('says so when no base was given', () => {
+    const text = formatCi(problems, evaluateCi(problems, { failOn: 'stale' }), plain);
+    expect(text).toContain('No base given: checking all 13 packages');
+    expect(text).toContain('(--fail-on stale)');
   });
 });

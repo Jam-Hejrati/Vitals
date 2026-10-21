@@ -120,3 +120,84 @@ describe('formatting', () => {
     expect(formatBytes(1_300_000)).toBe('1.2 MB');
   });
 });
+
+describe('GitHub signals', () => {
+  const inactive = (repository: object, overrides: Partial<PackageSignals> = {}) =>
+    assess(
+      signals({
+        repository: {
+          id: 'r',
+          openIssues: 2,
+          commitsLast90Days: 0,
+          issueActivityLast90Days: 0,
+          ...repository,
+        },
+        ...overrides,
+      }),
+      { now },
+    );
+
+  it('treats an archived repository as evidence of neglect for a sizeable package', () => {
+    const result = inactive({ archived: true });
+    expect(result.verdict).toBe('abandoned');
+    expect(result.reasons).toContain('repository is archived (read-only)');
+  });
+
+  it('lets a small archived package be finished', () => {
+    const result = inactive({ archived: true }, { unpackedSize: 4_000 });
+    expect(result.verdict).toBe('finished');
+    expect(result.reasons).toContain('repository is archived (read-only)');
+  });
+
+  it('only warns about an archived repository when the package is still released', () => {
+    const result = inactive({ archived: true }, { lastPublishedAt: monthsAgo(3) });
+    expect(result.verdict).toBe('active');
+    expect(result.warnings.map((w) => w.code)).toEqual(['archived']);
+  });
+
+  it('warns about a single maintainer without changing the verdict', () => {
+    const result = inactive({
+      commitsLast90Days: 4,
+      committers: 1,
+      topCommitterShare: 1,
+      sampledCommits: 40,
+    });
+    expect(result.verdict).toBe('active');
+    expect(result.warnings).toEqual([
+      { code: 'single-maintainer', message: 'one person wrote 100% of the last 40 commits' },
+    ]);
+  });
+
+  it('does not call a package single-maintainer on too little evidence', () => {
+    const result = inactive({ commitsLast90Days: 1, topCommitterShare: 1, sampledCommits: 3 });
+    expect(result.warnings).toEqual([]);
+  });
+});
+
+describe('small packages and open issues', () => {
+  const withIssues = (openIssues: number, overrides: Partial<PackageSignals> = {}) =>
+    assess(
+      signals({
+        unpackedSize: 5_000,
+        weeklyDownloads: 20_000_000,
+        repository: { id: 'r', openIssues, commitsLast90Days: 0, issueActivityLast90Days: 0 },
+        ...overrides,
+      }),
+      { now },
+    );
+
+  it('lets a small package with a moderate backlog be finished', () => {
+    // 60 issues for 20M downloads is 3 per million: enough to worry about a large package.
+    expect(withIssues(60).verdict).toBe('finished');
+    expect(withIssues(60, { unpackedSize: 900_000 }).verdict).toBe('abandoned');
+  });
+
+  it('still calls a small package abandoned when the backlog is overwhelming', () => {
+    // 150 issues for 20M downloads is 7.5 per million.
+    expect(withIssues(150).verdict).toBe('abandoned');
+  });
+
+  it('does not count a handful of issues against a small package', () => {
+    expect(withIssues(25, { weeklyDownloads: 1_000_000 }).verdict).toBe('finished');
+  });
+});

@@ -1,20 +1,45 @@
 {
-  "name": "@vitals/cli",
-  "version": "0.0.0",
+  "name": "dep-vitals",
+  "version": "0.1.0",
   "private": true,
-  "description": "Find out whether your dependencies are alive, finished, or dying.",
+  "description": "Find out whether your dependencies are alive, finished, or dying: maintenance health, not just versions or vulnerabilities.",
+  "keywords": [
+    "dependencies",
+    "dependency-health",
+    "maintenance",
+    "abandoned",
+    "deprecated",
+    "bus-factor",
+    "supply-chain",
+    "npm",
+    "pnpm",
+    "cli",
+    "ci"
+  ],
   "license": "MIT",
+  "author": "Jam Hejrati",
+  "homepage": "https://github.com/Jam-Hejrati/Vitals#readme",
+  "bugs": "https://github.com/Jam-Hejrati/Vitals/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jam-Hejrati/Vitals.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "bin": {
-    "vitals": "./dist/index.js"
+    "vitals": "./dist/vitals.js"
   },
   "files": [
-    "dist"
+    "dist/vitals.js"
   ],
   "engines": {
     "node": ">=22.12"
   },
-  "dependencies": {
+  "scripts": {
+    "build": "tsc -b ../.. && node scripts/bundle.mjs",
+    "prepack": "node scripts/prepack.mjs"
+  },
+  "devDependencies": {
     "@vitals/core": "workspace:*"
   }
 }

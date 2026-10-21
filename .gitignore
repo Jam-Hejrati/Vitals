@@ -3,3 +3,8 @@ dist/
 coverage/
 *.tsbuildinfo
 .DS_Store
+packages/cli/LICENSE
+packages/cli/README.md
+# Copied in by packages/cli/scripts/prepack.mjs when packing
+packages/cli/LICENSE
+packages/cli/README.md

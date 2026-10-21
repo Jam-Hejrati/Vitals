@@ -134,6 +134,41 @@ describe('collectSignals', () => {
     });
   });
 
+  describe('GitHub', () => {
+    const github = {
+      ...routes,
+      'https://api.github.com/repos/o/old-v2/commits': () =>
+        Array.from({ length: 12 }, () => ({ author: { login: 'alice', type: 'User' } })),
+      'https://api.github.com/repos/o/old-v2': () => ({ archived: false }),
+    };
+
+    it('adds archive status and committers for a direct dependency when given a token', async () => {
+      const signals = await collectSignals(graph, {
+        http: new HttpClient({ fetch: fakeFetch(github), retryDelayMs: 0 }),
+        cache: new MemoryCache(),
+        now: new Date('2026-10-20T00:00:00Z'),
+        githubToken: 'token',
+      });
+      expect(signals.get('old@1.0.0')?.repository).toMatchObject({
+        archived: false,
+        committers: 1,
+        topCommitterShare: 1,
+        sampledCommits: 12,
+      });
+    });
+
+    it('never calls GitHub without a token', async () => {
+      const fetch = fakeFetch(github);
+      const signals = await collectSignals(graph, {
+        http: new HttpClient({ fetch, retryDelayMs: 0 }),
+        cache: new MemoryCache(),
+        now: new Date('2026-10-20T00:00:00Z'),
+      });
+      expect(fetch.requests.some((r) => r.url.startsWith('https://api.github.com'))).toBe(false);
+      expect(signals.get('old@1.0.0')?.repository?.archived).toBeUndefined();
+    });
+  });
+
   describe('inactive packages', () => {
     const inactive = new Date('2028-01-01T00:00:00Z');
     const sizeAndDownloads = {
