@@ -200,8 +200,9 @@ historical data.
 - Exact thresholds for size, "long without releases" and unmet demand — tuned against the golden set.
 - Severity levels and default `--fail-on` threshold for CI.
 - History storage — SQLite in a user cache dir for local runs; JSON snapshot for CI.
-- npm package name — `vitals`, `vitals-cli` and `depvitals` are taken; `dep-vitals` was free (Oct 2026),
-  or publish under a personal scope. Decide before first publish.
+- ~~npm package name~~ Decided: `dependency-vitals`. (`vitals`, `vitals-cli` and `depvitals` are
+  taken, and npm rejected `dep-vitals` as too similar to `depvitals`: it ignores dashes when it
+  compares names.)
 
 ## Known limitations
 

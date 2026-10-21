@@ -13,13 +13,13 @@ issue when one looks wrong; that is how the model gets better.
 ## Quick start
 
 ```bash
-npx dep-vitals            # in a folder with a package-lock.json or pnpm-lock.yaml
-npx dep-vitals --all      # include healthy packages
-npx dep-vitals --json     # machine-readable report
+npx dependency-vitals          # in a folder with a package-lock.json or pnpm-lock.yaml
+npx dependency-vitals --all    # include healthy packages
+npx dependency-vitals --json   # machine-readable report
 ```
 
 Requires Node.js 22.12 or newer. No setup, no account, no token needed. The command is `vitals`
-once installed (`npm i -g dep-vitals`).
+once installed (`npm i -g dependency-vitals`).
 
 ## What you get
 
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npx dep-vitals --ci
+      - run: npx dependency-vitals --ci
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
