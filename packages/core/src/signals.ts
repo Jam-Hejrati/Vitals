@@ -71,6 +71,21 @@ export interface CollectSignalsOptions {
    * repositories and who actually commits. Without one, those signals are simply absent.
    */
   githubToken?: string;
+  /** Called as the lookups advance, so a caller can show progress. */
+  onProgress?: (progress: Progress) => void;
+}
+
+/**
+ * The lookups in the order they run. `packages`, `inactive` and `github` report every package as
+ * it finishes; the batched `details` step only reports its start and end.
+ */
+export const STAGES = ['packages', 'details', 'inactive', 'github'] as const;
+export type Stage = (typeof STAGES)[number];
+
+export interface Progress {
+  stage: Stage;
+  done: number;
+  total: number;
 }
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -92,8 +107,11 @@ export async function collectSignals(
     (node) => !node.local && REGISTRY_VERSION.test(node.version),
   );
   const names = [...new Set(nodes.map((node) => node.name))];
+  const report = (stage: Stage) => (done: number, total: number) =>
+    options.onProgress?.({ stage, done, total });
 
-  const packages = await depsDev.getPackages(names);
+  report('packages')(0, names.length);
+  const packages = await depsDev.getPackages(names, report('packages'));
 
   // Licenses come from the installed version; the repository from the latest, as repos move.
   const versionKeys = new Map<string, { name: string; version: string }>();
@@ -102,7 +120,9 @@ export async function collectSignals(
     const latest = latestVersion(packages.get(node.name));
     if (latest) versionKeys.set(`${node.name}@${latest}`, { name: node.name, version: latest });
   }
+  report('details')(0, 2);
   const details = await depsDev.getVersionDetails([...versionKeys.values()]);
+  report('details')(1, 2);
 
   const repositoryOf = (node: PackageNode): string | undefined => {
     const latest = latestVersion(packages.get(node.name));
@@ -113,6 +133,7 @@ export async function collectSignals(
   };
   const repositoryIds = [...new Set(nodes.map(repositoryOf).filter((id) => id !== undefined))];
   const projects = await depsDev.getProjects(repositoryIds);
+  report('details')(2, 2);
 
   // Size and download counts only matter for inactive packages: no release in the last year and
   // no recent repository commits. Skipping the rest saves most of the requests.
@@ -126,8 +147,9 @@ export async function collectSignals(
     return !((commits.commitsLast90Days ?? 0) > 0);
   };
   const inactiveNames = names.filter(isInactive);
+  report('inactive')(0, inactiveNames.length);
   const [sizes, weeklyDownloads] = await Promise.all([
-    registry.getLatestSizes(inactiveNames),
+    registry.getLatestSizes(inactiveNames, report('inactive')),
     downloads.getWeeklyDownloads(inactiveNames),
   ]);
 
@@ -140,12 +162,14 @@ export async function collectSignals(
       .filter((name) => directNames.has(name) || inactiveNames.includes(name))
       .map((name) => repositoryByName.get(name))
       .filter((id) => id !== undefined);
+    const unique = [...new Set(wanted)];
+    report('github')(0, unique.length);
     repositories = await new GitHubClient(
       http,
       cache,
       options.githubToken,
       () => now,
-    ).getRepositories([...new Set(wanted)]);
+    ).getRepositories(unique, report('github'));
   }
 
   const signals = new Map<string, PackageSignals>();

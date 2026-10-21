@@ -6,7 +6,7 @@ import {
   type PackageSignals,
 } from '@vitals/core';
 import { describe, expect, it } from 'vitest';
-import { formatCi, formatReport } from '../src/format.js';
+import { allocate, formatCi, formatReport, supportsLinks } from '../src/format.js';
 
 const now = new Date('2026-10-20T00:00:00Z');
 
@@ -251,5 +251,64 @@ describe('formatCi', () => {
     const text = formatCi(problems, evaluateCi(problems, { failOn: 'stale' }), plain);
     expect(text).toContain('No base given: checking all 13 packages');
     expect(text).toContain('(--fail-on stale)');
+  });
+});
+
+describe('formatReport on a color terminal', () => {
+  const fancy = { all: false, color: true, durationMs: 2140 };
+  // eslint-disable-next-line no-control-regex
+  const strip = (text: string) => text.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '');
+
+  it('boxes the header and shows how long the check took', () => {
+    const lines = strip(formatReport(problems, fancy)).split('\n');
+    expect(lines[0]).toMatch(/^╭─+╮$/);
+    expect(lines[1]).toMatch(/^│ {2}Vitals · app · package-lock\.json +│$/);
+    expect(lines[2]).toMatch(/^│ {2}13 packages checked \(4 direct\) in 2\.1s +│$/);
+    expect(new Set(lines.slice(0, 4).map((line) => line.length)).size).toBe(1);
+  });
+
+  it('marks problems with a badge', () => {
+    expect(formatReport(problems, fancy)).toContain('\x1b[1;97;41m DEPRECATED \x1b[0m');
+  });
+
+  it('draws a health bar', () => {
+    const text = strip(formatReport(problems, fancy));
+    expect(text).toMatch(/Health {2}█{40} {2}23% healthy/);
+  });
+
+  it('links package names to npm only when asked to', () => {
+    const url = 'https://www.npmjs.com/package/old/v/1.0.0';
+    expect(formatReport(problems, fancy)).not.toContain(url);
+    expect(formatReport(problems, { ...fancy, links: true })).toContain(`\x1b]8;;${url}\x07`);
+  });
+});
+
+describe('allocate', () => {
+  it('splits the width in proportion', () => {
+    expect(allocate([1, 1, 2], 8)).toEqual([2, 2, 4]);
+  });
+
+  it('keeps a single problem visible', () => {
+    expect(allocate([1, 0, 999], 40)).toEqual([1, 0, 39]);
+  });
+
+  it('always fills exactly the width', () => {
+    for (const counts of [
+      [1, 1, 1],
+      [3, 0, 7, 1],
+      [1, 1, 1, 1, 1, 1],
+      [0, 5],
+    ]) {
+      expect(allocate(counts, 10).reduce((a, b) => a + b, 0)).toBe(10);
+    }
+  });
+});
+
+describe('supportsLinks', () => {
+  it('recognizes terminals with hyperlinks and stays off elsewhere', () => {
+    expect(supportsLinks({ WT_SESSION: '1' })).toBe(true);
+    expect(supportsLinks({ TERM_PROGRAM: 'vscode' })).toBe(true);
+    expect(supportsLinks({ TERM_PROGRAM: 'vscode', CI: 'true' })).toBe(false);
+    expect(supportsLinks({ TERM: 'xterm' })).toBe(false);
   });
 });

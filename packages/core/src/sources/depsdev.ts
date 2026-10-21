@@ -1,5 +1,5 @@
 import { cached, type Cache } from './cache.js';
-import { chunk, mapLimit } from './concurrency.js';
+import { chunk, mapLimit, progressOf, type OnProgress } from './concurrency.js';
 import type { HttpClient } from './http.js';
 
 const BASE_URL = 'https://api.deps.dev';
@@ -46,9 +46,17 @@ export class DepsDevClient {
   ) {}
 
   /** All published versions of each package. */
-  getPackages(names: string[]): Promise<Map<string, DepsDevPackage | null>> {
+  getPackages(
+    names: string[],
+    onProgress?: OnProgress,
+  ): Promise<Map<string, DepsDevPackage | null>> {
     return cached(this.cache, 'depsdev-package', names, async (missing) => {
-      const packages = await mapLimit(missing, CONCURRENCY, (name) => this.fetchPackage(name));
+      const packages = await mapLimit(
+        missing,
+        CONCURRENCY,
+        (name) => this.fetchPackage(name),
+        progressOf(names, missing, onProgress),
+      );
       return new Map(packages.flatMap((pkg) => (pkg ? [[pkg.name, pkg]] : [])));
     });
   }

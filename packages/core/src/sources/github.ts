@@ -1,5 +1,5 @@
 import { cached, type Cache } from './cache.js';
-import { mapLimit } from './concurrency.js';
+import { mapLimit, progressOf, type OnProgress } from './concurrency.js';
 import { HttpError, type HttpClient } from './http.js';
 
 const API_URL = 'https://api.github.com';
@@ -37,30 +37,38 @@ export class GitHubClient {
   ) {}
 
   /** Keyed by deps.dev project id (`github.com/owner/repo`); other hosts are ignored. */
-  getRepositories(ids: string[]): Promise<Map<string, GitHubRepository | null>> {
+  getRepositories(
+    ids: string[],
+    onProgress?: OnProgress,
+  ): Promise<Map<string, GitHubRepository | null>> {
     const supported = ids.filter((id) => id.startsWith(PREFIX));
     return cached(this.cache, 'github-repo', supported, async (missing) => {
       const results = new Map<string, GitHubRepository | undefined>();
       let exhausted = false;
-      await mapLimit(missing, CONCURRENCY, async (id) => {
-        if (exhausted) {
-          results.set(id, undefined);
-          return;
-        }
-        try {
-          const repository = await this.fetchRepository(id.slice(PREFIX.length));
-          if (repository) results.set(id, repository);
-        } catch (error) {
-          if (error instanceof HttpError && error.status === 401) {
-            throw new Error('GitHub rejected the token (HTTP 401). Check GITHUB_TOKEN.', {
-              cause: error,
-            });
+      await mapLimit(
+        missing,
+        CONCURRENCY,
+        async (id) => {
+          if (exhausted) {
+            results.set(id, undefined);
+            return;
           }
-          // Rate limited (403/429) or unreachable: skip the rest and try again next run.
-          exhausted = true;
-          results.set(id, undefined);
-        }
-      });
+          try {
+            const repository = await this.fetchRepository(id.slice(PREFIX.length));
+            if (repository) results.set(id, repository);
+          } catch (error) {
+            if (error instanceof HttpError && error.status === 401) {
+              throw new Error('GitHub rejected the token (HTTP 401). Check GITHUB_TOKEN.', {
+                cause: error,
+              });
+            }
+            // Rate limited (403/429) or unreachable: skip the rest and try again next run.
+            exhausted = true;
+            results.set(id, undefined);
+          }
+        },
+        progressOf(supported, missing, onProgress),
+      );
       return results;
     });
   }

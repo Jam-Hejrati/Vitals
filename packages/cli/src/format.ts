@@ -3,9 +3,14 @@ import type { CiResult, FailLevel, PackageReport, Report, Suggestion, Verdict } 
 export interface FormatOptions {
   /** List healthy packages too, and every nested problem instead of the first few. */
   all: boolean;
+  /** A color terminal: also draws the header box, verdict badges and the health bar. */
   color: boolean;
+  /** Make package names clickable links to npm (OSC 8), for terminals that support it. */
+  links?: boolean;
   /** Whether GitHub data was used. When explicitly false, the report mentions how to enable it. */
   github?: boolean;
+  /** How long the check took, shown in the header. */
+  durationMs?: number;
 }
 
 type Problem = 'deprecated' | 'abandoned' | 'stale';
@@ -19,18 +24,38 @@ const DETAIL_WIDTH = 100;
 const MAX_SUGGESTIONS = 3;
 const MAX_SUGGESTIONS_INLINE = 2;
 
-const STYLES = { red: 31, yellow: 33, green: 32, gray: 90, bold: 1 } as const;
-type Style = keyof typeof STYLES;
-type Paint = (style: Style, text: string) => string;
+const HEALTH_BAR_WIDTH = 40;
 
-const VERDICT_STYLE: Record<Verdict, { icon: string; color: Style }> = {
-  deprecated: { icon: '✖', color: 'red' },
-  abandoned: { icon: '✖', color: 'red' },
-  stale: { icon: '▲', color: 'yellow' },
+const STYLES = {
+  red: '31',
+  yellow: '33',
+  green: '32',
+  cyan: '36',
+  gray: '90',
+  bold: '1',
+  redBadge: '1;97;41',
+  yellowBadge: '1;30;43',
+} as const;
+type Style = keyof typeof STYLES;
+interface Paint {
+  (style: Style, text: string): string;
+  /** `text` as a clickable link to `url`, when the terminal supports it. */
+  link(url: string, text: string): string;
+  /** Whether to draw the color-terminal extras (badges, box, health bar). */
+  fancy: boolean;
+}
+
+const VERDICT_STYLE: Record<Verdict, { icon: string; color: Style; badge?: Style }> = {
+  deprecated: { icon: '✖', color: 'red', badge: 'redBadge' },
+  abandoned: { icon: '✖', color: 'red', badge: 'redBadge' },
+  stale: { icon: '▲', color: 'yellow', badge: 'yellowBadge' },
   finished: { icon: '✔', color: 'green' },
   active: { icon: '✔', color: 'green' },
   unknown: { icon: '?', color: 'gray' },
 };
+
+/** Order of the health bar segments, worst first. */
+const BAR_ORDER: Verdict[] = ['deprecated', 'abandoned', 'stale', 'unknown', 'finished', 'active'];
 
 /** A direct dependency to act on, and the problems that only it is responsible for. */
 interface Group {
@@ -41,7 +66,103 @@ interface Group {
 }
 
 function createPaint(options: FormatOptions): Paint {
-  return (style, text) => (options.color ? `\x1b[${STYLES[style]}m${text}\x1b[0m` : text);
+  const paint = (style: Style, text: string) =>
+    options.color ? `\x1b[${STYLES[style]}m${text}\x1b[0m` : text;
+  return Object.assign(paint, {
+    link: (url: string, text: string) =>
+      options.links ? `\x1b]8;;${url}\x07${text}\x1b]8;;\x07` : text,
+    fancy: options.color,
+  });
+}
+
+/**
+ * Terminals known to render OSC 8 hyperlinks. Others may print the escape codes as text, so
+ * links stay off unless the terminal is recognized.
+ */
+export function supportsLinks(env: NodeJS.ProcessEnv): boolean {
+  if (env.CI || env.TERM === 'dumb') return false;
+  if (env.WT_SESSION || env.KITTY_WINDOW_ID || env.WEZTERM_PANE || env.DOMTERM) return true;
+  if (['vscode', 'iTerm.app', 'WezTerm', 'ghostty', 'Hyper'].includes(env.TERM_PROGRAM ?? '')) {
+    return true;
+  }
+  return Number(env.VTE_VERSION) >= 5000;
+}
+
+/** The npm page of a package, for links. */
+function npmUrl(pkg: { name: string; version: string }): string {
+  return `https://www.npmjs.com/package/${pkg.name}/v/${pkg.version}`;
+}
+
+function packageLabel(pkg: PackageReport, paint: Paint, bold = false): string {
+  const label = `${pkg.name}@${pkg.version}`;
+  return paint.link(npmUrl(pkg), bold ? paint('bold', label) : label);
+}
+
+/** The title and one line of detail; boxed on a color terminal. */
+function formatHeader(title: string, detail: string, paint: Paint): string[] {
+  if (!paint.fancy) return [title, detail, ''];
+  const width = Math.max(visibleLength(title), visibleLength(detail));
+  const row = (text: string) =>
+    `${paint('gray', '│')}  ${text}${' '.repeat(width - visibleLength(text))}  ${paint('gray', '│')}`;
+  return [
+    paint('gray', `╭${'─'.repeat(width + 4)}╮`),
+    row(title),
+    row(paint('gray', detail)),
+    paint('gray', `╰${'─'.repeat(width + 4)}╯`),
+    '',
+  ];
+}
+
+/** `████████████▓▓░  92% healthy`: each verdict's share of the packages, worst first. */
+function formatHealthBar(report: Report, paint: Paint): string {
+  const { total, verdicts } = report.summary;
+  if (total === 0) return '';
+  const cells = allocate(
+    BAR_ORDER.map((verdict) => verdicts[verdict]),
+    HEALTH_BAR_WIDTH,
+  );
+  const bar = BAR_ORDER.map((verdict, i) =>
+    cells[i] ? paint(VERDICT_STYLE[verdict].color, '█'.repeat(cells[i])) : '',
+  ).join('');
+  // Rounded down, so a project with any problem never shows 100%.
+  const healthy = Math.floor(((verdicts.finished + verdicts.active) / total) * 100);
+  const style: Style = healthy >= 90 ? 'green' : healthy >= 70 ? 'yellow' : 'red';
+  return `${paint('bold', 'Health')}  ${bar}  ${paint(style, `${healthy}%`)} ${paint('gray', 'healthy')}`;
+}
+
+/**
+ * Splits `width` cells in proportion to `counts` (largest remainder), giving every non-zero
+ * count at least one cell so a single problem stays visible.
+ */
+export function allocate(counts: number[], width: number): number[] {
+  const total = counts.reduce((sum, n) => sum + n, 0);
+  if (total === 0) return counts.map(() => 0);
+  const exact = counts.map((n) => (n / total) * width);
+  const cells = exact.map((x, i) => (counts[i]! > 0 ? Math.max(1, Math.floor(x)) : 0));
+  const order = exact
+    .map((x, i) => ({ i, remainder: x - Math.floor(x) }))
+    .filter(({ i }) => counts[i]! > 0)
+    .sort((a, b) => b.remainder - a.remainder);
+  let used = cells.reduce((sum, n) => sum + n, 0);
+  for (let k = 0; used < width && order.length > 0; k = (k + 1) % order.length, used++) {
+    cells[order[k]!.i]!++;
+  }
+  // The minimum of one cell can overshoot: take back from the largest segments.
+  while (used > width) {
+    const largest = cells.indexOf(Math.max(...cells));
+    cells[largest]!--;
+    used--;
+  }
+  return cells;
+}
+
+function visibleLength(text: string): number {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').length;
+}
+
+function formatDuration(ms: number): string {
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
 export function formatReport(report: Report, options: FormatOptions): string {
@@ -52,9 +173,12 @@ export function formatReport(report: Report, options: FormatOptions): string {
   const lines: string[] = [];
 
   lines.push(
-    `${paint('bold', 'Vitals')} · ${report.project.name} · ${report.project.lockfile}`,
-    `${plural(summary.total, 'package')} checked (${summary.direct} direct)`,
-    '',
+    ...formatHeader(
+      `${paint('bold', 'Vitals')} · ${report.project.name} · ${report.project.lockfile}`,
+      `${plural(summary.total, 'package')} checked (${summary.direct} direct)` +
+        (options.durationMs === undefined ? '' : ` in ${formatDuration(options.durationMs)}`),
+      paint,
+    ),
   );
 
   for (const group of groups) {
@@ -82,6 +206,7 @@ export function formatReport(report: Report, options: FormatOptions): string {
     }
   }
 
+  if (options.color) lines.push(formatHealthBar(report, paint));
   lines.push(formatSummary(report, paint));
 
   // Problems cut off by a cap say so where they are listed; this counts what --all would add.
@@ -122,13 +247,13 @@ const FAIL_CRITERIA: Record<FailLevel, string> = {
 /** The result of `--ci`: only what the check is about, and whether it passed. */
 export function formatCi(report: Report, ci: CiResult, options: FormatOptions): string {
   const paint = createPaint(options);
-  const lines = [
+  const lines = formatHeader(
     `${paint('bold', 'Vitals CI')} · ${report.project.name} · ${report.project.lockfile}`,
     ci.base === undefined
       ? `No base given: checking all ${plural(ci.newPackages, 'package')}`
       : `Compared with ${ci.base}: ${plural(ci.newPackages, 'new package')}`,
-    '',
-  ];
+    paint,
+  );
 
   const { groups, shared } = groupProblems(report.packages, ci.offenders);
   for (const group of groups) lines.push(...formatGroup(group, options, paint), '');
@@ -219,9 +344,7 @@ function formatGroup(group: Group, options: FormatOptions, paint: Paint): string
     lines.push(...describeProblem(head, paint));
   } else if (head) {
     const { icon, color } = VERDICT_STYLE[head.verdict];
-    lines.push(
-      `${paint(color, icon)}  ${paint('bold', `${head.name}@${head.version}`)}  ${tags(head, paint)}`,
-    );
+    lines.push(`${paint(color, icon)}  ${packageLabel(head, paint, true)}  ${tags(head, paint)}`);
   } else {
     lines.push(
       `${paint('gray', '▸')}  ${paint('bold', nameOf(group.id))}  ${paint('gray', '(local package)')}`,
@@ -244,11 +367,13 @@ function formatGroup(group: Group, options: FormatOptions, paint: Paint): string
 }
 
 function describeProblem(pkg: PackageReport, paint: Paint): string[] {
-  const { icon, color } = VERDICT_STYLE[pkg.verdict];
+  const { icon, color, badge } = VERDICT_STYLE[pkg.verdict];
   const heading = [
     paint(color, icon),
-    paint('bold', `${pkg.name}@${pkg.version}`),
-    paint(color, pkg.verdict.toUpperCase()),
+    packageLabel(pkg, paint, true),
+    badge && paint.fancy
+      ? paint(badge, ` ${pkg.verdict.toUpperCase()} `)
+      : paint(color, pkg.verdict.toUpperCase()),
     tags(pkg, paint),
   ];
   const lines = [heading.filter(Boolean).join('  ')];
@@ -279,7 +404,7 @@ function oneLine(pkg: PackageReport, paint: Paint): string {
       : []),
   ];
   return (
-    `${paint(color, icon)} ${pkg.name}@${pkg.version}  ${paint(color, pkg.verdict)}  ` +
+    `${paint(color, icon)} ${packageLabel(pkg, paint)}  ${paint(color, pkg.verdict)}  ` +
     `${paint('gray', truncate(detail, DETAIL_WIDTH))}${advice.map((a) => ` → ${a}`).join('')}`
   );
 }
