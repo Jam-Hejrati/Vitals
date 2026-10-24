@@ -11,6 +11,8 @@ export interface FormatOptions {
   github?: boolean;
   /** How long the check took, shown in the header. */
   durationMs?: number;
+  /** Terminal width; list lines are cut to fit it. */
+  width?: number;
 }
 
 type Problem = 'deprecated' | 'abandoned' | 'stale';
@@ -21,6 +23,8 @@ const PROBLEM_ORDER: Record<Problem, number> = { deprecated: 0, abandoned: 1, st
 const MAX_NESTED = 5;
 const MAX_SHARED = 8;
 const DETAIL_WIDTH = 100;
+/** Narrower than this, reasons wrap instead of being cut to nothing. */
+const MIN_DETAIL_WIDTH = 24;
 const MAX_SUGGESTIONS = 3;
 const MAX_SUGGESTIONS_INLINE = 2;
 
@@ -33,8 +37,9 @@ const STYLES = {
   cyan: '36',
   gray: '90',
   bold: '1',
-  redBadge: '1;97;41',
-  yellowBadge: '1;30;43',
+  // Reverse video: the text takes the terminal's background color, readable in any theme.
+  redBadge: '1;7;31',
+  yellowBadge: '1;7;33',
 } as const;
 type Style = keyof typeof STYLES;
 interface Paint {
@@ -43,6 +48,8 @@ interface Paint {
   link(url: string, text: string): string;
   /** Whether to draw the color-terminal extras (badges, box, health bar). */
   fancy: boolean;
+  /** Terminal width, when known. */
+  width: number | undefined;
 }
 
 const VERDICT_STYLE: Record<Verdict, { icon: string; color: Style; badge?: Style }> = {
@@ -72,6 +79,7 @@ function createPaint(options: FormatOptions): Paint {
     link: (url: string, text: string) =>
       options.links ? `\x1b]8;;${url}\x07${text}\x1b]8;;\x07` : text,
     fancy: options.color,
+    width: options.width,
   });
 }
 
@@ -89,7 +97,7 @@ export function supportsLinks(env: NodeJS.ProcessEnv): boolean {
 }
 
 /** The npm page of a package, for links. */
-function npmUrl(pkg: { name: string; version: string }): string {
+export function npmUrl(pkg: { name: string; version: string }): string {
   return `https://www.npmjs.com/package/${pkg.name}/v/${pkg.version}`;
 }
 
@@ -201,7 +209,7 @@ export function formatReport(report: Report, options: FormatOptions): string {
     const rest = report.packages.filter((pkg) => !displayed.has(pkg.id));
     if (rest.length > 0) {
       lines.push(paint('bold', 'Everything else:'));
-      for (const pkg of rest) lines.push(`  ${oneLine(pkg, paint)}`);
+      for (const pkg of rest) lines.push(oneLine(pkg, paint, '  '));
       lines.push('');
     }
   }
@@ -238,7 +246,7 @@ export function formatReport(report: Report, options: FormatOptions): string {
   return lines.join('\n') + '\n';
 }
 
-const FAIL_CRITERIA: Record<FailLevel, string> = {
+export const FAIL_CRITERIA: Record<FailLevel, string> = {
   deprecated: 'deprecated',
   abandoned: 'deprecated or abandoned',
   stale: 'deprecated, abandoned or stale',
@@ -260,7 +268,7 @@ export function formatCi(report: Report, ci: CiResult, options: FormatOptions): 
   lines.push(...formatShared(shared, options, paint).lines);
   if (ci.watch.length > 0) {
     lines.push(paint('bold', 'Worth a look (not failing the check):'));
-    for (const pkg of ci.watch) lines.push(`  ${oneLine(pkg, paint)}`);
+    for (const pkg of ci.watch) lines.push(oneLine(pkg, paint, '  '));
     lines.push('');
   }
 
@@ -327,7 +335,7 @@ function formatShared(
   const shown = visible(shared, MAX_SHARED, options);
   const lines = [paint('bold', 'Shared by several dependencies (all of them need to change):')];
   for (const pkg of shown) {
-    lines.push(`  ${oneLine(pkg, paint)}${paint('gray', `  via ${viaNames(pkg)}`)}`);
+    lines.push(oneLine(pkg, paint, '  ', paint('gray', `  via ${viaNames(pkg)}`)));
   }
   if (shown.length < shared.length) {
     lines.push(paint('gray', `  …and ${shared.length - shown.length} more (use --all)`));
@@ -358,7 +366,7 @@ function formatGroup(group: Group, options: FormatOptions, paint: Paint): string
       paint('gray', `    ${also} ${plural(children.length, 'package')} that ${needs} attention:`),
     );
     const shown = visible(children, MAX_NESTED, options);
-    for (const child of shown) lines.push(`      ${oneLine(child, paint)}`);
+    for (const child of shown) lines.push(oneLine(child, paint, '      '));
     if (shown.length < children.length) {
       lines.push(paint('gray', `      …and ${children.length - shown.length} more (use --all)`));
     }
@@ -389,8 +397,11 @@ function describeProblem(pkg: PackageReport, paint: Paint): string[] {
   return lines;
 }
 
-/** `✖ name@1.0.0  deprecated  reasons → advice`, short enough to sit in a list. */
-function oneLine(pkg: PackageReport, paint: Paint): string {
+/**
+ * `✖ name@1.0.0  deprecated  reasons → advice`, short enough to sit in a list. On a terminal the
+ * reasons are cut so that the line, with `indent` and `suffix`, fits its width.
+ */
+function oneLine(pkg: PackageReport, paint: Paint, indent: string, suffix = ''): string {
   const { icon, color } = VERDICT_STYLE[pkg.verdict];
   const reasons = pkg.reasons.map((reason) => reason.replace(/^deprecated: /, ''));
   const detail =
@@ -403,10 +414,16 @@ function oneLine(pkg: PackageReport, paint: Paint): string {
       ? [`instead: ${suggestionList(pkg.replacements, MAX_SUGGESTIONS_INLINE)}`]
       : []),
   ];
-  return (
-    `${paint(color, icon)} ${packageLabel(pkg, paint)}  ${paint(color, pkg.verdict)}  ` +
-    `${paint('gray', truncate(detail, DETAIL_WIDTH))}${advice.map((a) => ` → ${a}`).join('')}`
-  );
+  const head = `${indent}${paint(color, icon)} ${packageLabel(pkg, paint)}  ${paint(color, pkg.verdict)}  `;
+  const tail = `${advice.map((a) => ` → ${a}`).join('')}${suffix}`;
+  const room =
+    paint.width === undefined
+      ? DETAIL_WIDTH
+      : Math.min(
+          DETAIL_WIDTH,
+          Math.max(MIN_DETAIL_WIDTH, paint.width - visibleLength(head) - visibleLength(tail)),
+        );
+  return `${head}${paint('gray', truncate(detail, room))}${tail}`;
 }
 
 /** Direct dependencies that are healthy, but worth knowing about. Needs GitHub data. */
@@ -423,7 +440,7 @@ function formatNotices(report: Report, paint: Paint): string[] {
   return lines;
 }
 
-function suggestionList(suggestions: Suggestion[], max: number): string {
+export function suggestionList(suggestions: Suggestion[], max: number): string {
   return suggestions
     .slice(0, max)
     .map((s) => (s.kind === 'native' ? `${s.name} (built in)` : s.name))
@@ -457,7 +474,7 @@ function visible<T>(items: T[], max: number, options: FormatOptions): T[] {
   return options.all ? items : items.slice(0, max);
 }
 
-function isProblem(pkg: PackageReport): boolean {
+export function isProblem(pkg: PackageReport): boolean {
   return pkg.verdict in PROBLEM_ORDER;
 }
 
@@ -466,14 +483,14 @@ function viaNames(pkg: PackageReport): string {
 }
 
 /** `name@1.2.3` or `@scope/name@1.2.3` → the package name. */
-function nameOf(id: string): string {
+export function nameOf(id: string): string {
   return id.slice(0, id.lastIndexOf('@'));
 }
 
-function plural(count: number, noun: string): string {
+export function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
-function truncate(text: string, width: number): string {
+export function truncate(text: string, width: number): string {
   return text.length <= width ? text : `${text.slice(0, width - 1).trimEnd()}…`;
 }

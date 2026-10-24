@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
@@ -19,6 +19,7 @@ import {
 import { UsageError } from './errors.js';
 import { formatCi, formatReport, supportsLinks } from './format.js';
 import { readFileAtRef } from './git.js';
+import { formatCiMarkdown, formatReportMarkdown } from './markdown.js';
 import { ProgressLine } from './progress.js';
 
 const HELP = `Usage: vitals [directory] [options]
@@ -35,13 +36,15 @@ checks archived repositories and finds dependencies maintained by a single perso
   shell history.
 
 Options:
-  --all          List healthy packages too, not just the ones that need attention
-  --prod         Ignore packages that are only used for development
-  --json         Print the full report as JSON
-  --no-github    Do not use the GitHub API even if GITHUB_TOKEN is set
-  --no-color     Disable colors (also set by NO_COLOR)
-  -h, --help     Show this help
-  -v, --version  Show the version
+  --all                List healthy packages too, not just the ones that need attention
+  --prod               Ignore packages that are only used for development
+  --json               Print the full report as JSON
+  --markdown <file>    Also write the report as Markdown to <file>, for pull request comments
+                       and job summaries (- prints it instead of the usual report)
+  --no-github          Do not use the GitHub API even if GITHUB_TOKEN is set
+  --no-color           Disable colors (also set by NO_COLOR)
+  -h, --help           Show this help
+  -v, --version        Show the version
 
 For CI (exit code 1 when the check fails, 2 on errors):
   --ci                 Fail when dependencies are deprecated, abandoned or stale
@@ -57,6 +60,7 @@ async function main(): Promise<number> {
       all: { type: 'boolean' },
       prod: { type: 'boolean' },
       json: { type: 'boolean' },
+      markdown: { type: 'string' },
       'no-github': { type: 'boolean' },
       'no-color': { type: 'boolean' },
       ci: { type: 'boolean' },
@@ -99,8 +103,11 @@ async function main(): Promise<number> {
     ? undefined
     : (process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN);
   const noColor = values['no-color'] === true || Boolean(process.env.NO_COLOR);
+  if (values.json && values.markdown === '-') {
+    throw new UsageError('--json and --markdown - both print to the standard output; pick one.');
+  }
   const progress =
-    process.stderr.isTTY && !values.json
+    process.stderr.isTTY && !values.json && values.markdown !== '-'
       ? new ProgressLine(process.stderr, { github: githubToken !== undefined, color: !noColor })
       : undefined;
   const started = performance.now();
@@ -121,6 +128,15 @@ async function main(): Promise<number> {
     ? evaluateCi(report, { failOn, ...(baseNames && baseRef && { base: baseRef, baseNames }) })
     : undefined;
 
+  if (values.markdown !== undefined) {
+    const markdown = ci ? formatCiMarkdown(report, ci) : formatReportMarkdown(report);
+    if (values.markdown === '-') {
+      process.stdout.write(markdown);
+      return ci && !ci.passed ? 1 : 0;
+    }
+    await writeFile(values.markdown, markdown);
+  }
+
   if (values.json) {
     const output = ci ? { ...report, ci: ciSummary(ci) } : report;
     process.stdout.write(JSON.stringify(output, null, 2) + '\n');
@@ -132,6 +148,7 @@ async function main(): Promise<number> {
       links: color && supportsLinks(process.env),
       github: githubToken !== undefined,
       durationMs,
+      ...(process.stdout.isTTY && process.stdout.columns && { width: process.stdout.columns }),
     };
     process.stdout.write(ci ? formatCi(report, ci, options) : formatReport(report, options));
   }
