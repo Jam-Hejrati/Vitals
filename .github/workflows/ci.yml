@@ -21,3 +21,41 @@ jobs:
       - run: pnpm format:check
       - run: pnpm test
       - run: pnpm release:check
+
+  # Runs the GitHub Action from this repository, with the CLI built from this commit.
+  action:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C packages/cli build
+
+      # Dogfooding: this repository's own new dependencies.
+      - uses: ./
+        with:
+          version: ./packages/cli
+
+      # The demo project has known problems: the check must fail, and say so.
+      - uses: ./
+        id: demo
+        continue-on-error: true
+        with:
+          directory: docs/demo
+          version: ./packages/cli
+          base: none
+          comment: 'false'
+      - name: The demo project fails the check
+        env:
+          OUTCOME: ${{ steps.demo.outcome }}
+          STATUS: ${{ steps.demo.outputs.status }}
+        run: |
+          test "$OUTCOME" = failure
+          test "$STATUS" = fail

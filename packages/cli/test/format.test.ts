@@ -268,7 +268,24 @@ describe('formatReport on a color terminal', () => {
   });
 
   it('marks problems with a badge', () => {
-    expect(formatReport(problems, fancy)).toContain('\x1b[1;97;41m DEPRECATED \x1b[0m');
+    expect(formatReport(problems, fancy)).toContain('\x1b[1;7;31m DEPRECATED \x1b[0m');
+  });
+
+  it('cuts list lines to the terminal width', () => {
+    const long = reportFor([
+      ...healthy,
+      signal('old'),
+      signal('inner', { latestDeprecated: `gone ${'and more '.repeat(20)}` }),
+      ...extras.map((name) => signal(name)),
+      signal('leaf'),
+      signal('shared'),
+    ]);
+    const line = strip(formatReport(long, { ...fancy, width: 80 }))
+      .split('\n')
+      .find((l) => l.includes('inner@1.0.0'))!;
+    expect(line.length).toBeLessThanOrEqual(80);
+    expect(line.length).toBeGreaterThan(75);
+    expect(line.endsWith('…')).toBe(true);
   });
 
   it('draws a health bar', () => {

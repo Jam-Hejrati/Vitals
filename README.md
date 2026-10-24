@@ -3,11 +3,13 @@
 > `npm outdated` tells you a newer version exists.
 > **Vitals tells you whether the packages you depend on are alive, finished, or dying.**
 
+![Vitals checking a project: request and left-pad are deprecated, colors is abandoned, and each comes with what to use instead](docs/demo/demo.gif)
+
 A package can be fully up to date, have no known vulnerabilities, and still be abandoned. Vitals
 looks at the **maintenance health** of every package in your lockfile (direct and transitive), tells
 you which ones are a risk and why, and points at the dependency to change.
 
-**Status: early preview (0.1).** It works and is tested, but the verdicts are young. Please open an
+**Status: early preview (0.x).** It works and is tested, but the verdicts are young. Please open an
 issue when one looks wrong; that is how the model gets better.
 
 ## Quick start
@@ -59,29 +61,53 @@ before calling anything abandoned.
 
 ## Use it in CI
 
-Fail a pull request only when it **adds** an unhealthy dependency; existing ones are not your PR's
-problem:
+### GitHub Action
+
+Fail a pull request only when it **adds** an unhealthy dependency (existing ones are not your PR's
+problem), and say why in a comment on the pull request:
 
 ```yaml
 # .github/workflows/dependency-health.yml
 name: Dependency health
 on: pull_request
+permissions:
+  contents: read
+  pull-requests: write # for the comment
 jobs:
   vitals:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Vitals compares with the base branch's lockfile
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npx dependency-vitals --ci
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Jam-Hejrati/Vitals@v1
 ```
 
-On a pull request the base defaults to `origin/$GITHUB_BASE_REF`. Elsewhere, pass it yourself:
+The comment lists every new problem with the reason, the dependency that brings it in, and what to
+use instead. It is updated on every push, and only created when there is something to report. The
+same report goes to the job summary.
+
+| Input          | Default        | Description                                                                        |
+| -------------- | -------------- | ---------------------------------------------------------------------------------- |
+| `fail-on`      | `abandoned`    | `deprecated`, `abandoned` or `stale`                                               |
+| `directory`    | `.`            | Folder with the lockfile                                                           |
+| `base`         | PR base branch | Git ref to compare with; `none` checks every package                               |
+| `prod`         | `false`        | Ignore packages that are only used for development                                 |
+| `comment`      | `true`         | Comment on the pull request                                                        |
+| `version`      | `latest`       | Version of `dependency-vitals` to run                                              |
+| `github-token` | `github.token` | For the comment, and the GitHub checks (archived repositories, single maintainers) |
+
+Outputs: `passed` (`true`/`false`), `status` (`pass`, `warn` or `fail`) and `report` (path to the
+Markdown report). Pull requests from forks get a read-only token, so they get the job summary but no
+comment.
+
+### Any other CI
+
+```bash
+npx dependency-vitals --ci                          # exit code 1 when the check fails
+npx dependency-vitals --ci --markdown report.md     # also write the report as Markdown
+```
+
+The base branch has to be in the clone (with `actions/checkout`, `fetch-depth: 0`). On a GitHub pull
+request the base defaults to `origin/$GITHUB_BASE_REF`. Elsewhere, pass it yourself:
 
 ```bash
 vitals --ci --base origin/main --fail-on abandoned
@@ -100,6 +126,7 @@ vitals --ci --base origin/main --fail-on abandoned
 | `--all`             | List healthy packages too, and every nested problem                  |
 | `--prod`            | Ignore packages that are only used for development                   |
 | `--json`            | Print the full report as JSON (`schemaVersion` is included)          |
+| `--markdown <file>` | Also write the report as Markdown (`-` prints it instead)            |
 | `--no-github`       | Do not use the GitHub API even if a token is set                     |
 | `--no-color`        | Disable colors (also set by `NO_COLOR`)                              |
 | `--ci`              | Check mode for CI, see above                                         |

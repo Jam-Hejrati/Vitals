@@ -162,12 +162,12 @@ Beyond packages: GitHub Actions, Docker base images, editor extensions.
 - [x] `--ci` diff mode
 - [x] README
 - [x] Packaging: one self-contained file, checked by `pnpm release:check`
-- [ ] Demo GIF for the README
-- [ ] Publish to npm (needs the package name decided and an npm login)
+- [x] Demo GIF for the README (`docs/demo`, recorded with VHS)
+- [x] Publish to npm as `dependency-vitals`
 
 ### Phase 2 — Adoption
 
-- [ ] GitHub Action
+- [x] GitHub Action: PR comment and job summary (`action.yml`, `--markdown`)
 - [ ] Health trend between runs
 - [ ] README badge / project report card
 - [ ] yarn and bun lockfiles

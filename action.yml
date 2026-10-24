@@ -1,0 +1,142 @@
+name: Vitals dependency health
+description: Fail pull requests that add deprecated or abandoned npm dependencies, and explain why in a comment.
+author: Jam Hejrati
+branding:
+  icon: activity
+  color: green
+
+inputs:
+  fail-on:
+    description: 'How bad a new dependency must be to fail the check: deprecated, abandoned or stale.'
+    default: abandoned
+  directory:
+    description: Folder with the lockfile (package-lock.json or pnpm-lock.yaml).
+    default: .
+  base:
+    description: >-
+      Git ref to compare with: only packages that are new compared with it are checked. Defaults to
+      the base branch on pull requests; elsewhere every package is checked. `none` checks every
+      package, on pull requests too.
+    default: ''
+  prod:
+    description: Ignore packages that are only used for development.
+    default: 'false'
+  comment:
+    description: >-
+      Post the result as a pull request comment, updated on every run. A comment is only created
+      when there is something to report. Needs `pull-requests: write`.
+    default: 'true'
+  version:
+    description: Version of dependency-vitals to run (or a local path, to test a build).
+    default: latest
+  github-token:
+    description: >-
+      Token for the comment, and for the GitHub checks (archived repositories, single maintainers).
+    default: ${{ github.token }}
+
+outputs:
+  passed:
+    description: '"true" when no new dependency reached the fail-on level.'
+    value: ${{ steps.check.outputs.passed }}
+  status:
+    description: 'pass, warn (passed, with smaller problems worth a look) or fail.'
+    value: ${{ steps.check.outputs.status }}
+  report:
+    description: Path to the report as Markdown.
+    value: ${{ steps.check.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the Node.js version
+      id: node
+      shell: bash
+      run: |
+        major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)
+        echo "ok=$([ "$major" -ge 22 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Node.js 22
+      if: steps.node.outputs.ok != 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Fetch the base branch
+      # Enough for the comparison, even after a shallow checkout.
+      if: inputs.base == '' && github.base_ref != ''
+      shell: bash
+      env:
+        BASE_REF: ${{ github.base_ref }}
+      run: git fetch --no-tags --depth=1 origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+
+    - name: Check dependency health
+      id: check
+      shell: bash
+      env:
+        FAIL_ON: ${{ inputs.fail-on }}
+        DIRECTORY: ${{ inputs.directory }}
+        BASE: ${{ inputs.base }}
+        PROD: ${{ inputs.prod }}
+        VERSION: ${{ inputs.version }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        report=$(mktemp "$RUNNER_TEMP/vitals-XXXXXX")
+        case "$VERSION" in
+          .* | /*) package="$VERSION" ;;
+          *) package="dependency-vitals@$VERSION" ;;
+        esac
+        args=("$DIRECTORY" --ci --fail-on "$FAIL_ON" --markdown "$report")
+        if [ "$BASE" = none ]; then
+          unset GITHUB_BASE_REF # Otherwise the CLI compares with the pull request's base.
+        elif [ -n "$BASE" ]; then
+          args+=(--base "$BASE")
+        fi
+        if [ "$PROD" = true ]; then args+=(--prod); fi
+
+        set +e
+        npx --yes "$package" "${args[@]}"
+        code=$?
+        set -e
+
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+        if [ -s "$report" ]; then
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          status=$(head -n 1 "$report" | sed -n 's/.*status=\([a-z]*\).*/\1/p')
+          echo "report=$report" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "passed=$([ "$code" = 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Comment on the pull request
+      if: inputs.comment == 'true' && github.event.pull_request.number && steps.check.outputs.report
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+        REPORT: ${{ steps.check.outputs.report }}
+        STATUS: ${{ steps.check.outputs.status }}
+        DIRECTORY: ${{ inputs.directory }}
+      run: |
+        # One comment per checked folder, found again by this hidden key.
+        key="<!-- vitals-action: $DIRECTORY -->"
+        body="$RUNNER_TEMP/vitals-comment.md"
+        { echo "$key"; cat "$REPORT"; } > "$body"
+
+        existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+          --jq '.[] | "\(.id)\t\(.body | split("\n")[0])"' \
+          | awk -F '\t' -v key="$key" '$2 == key { print $1; exit }') || existing=""
+        if [ -n "$existing" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F "body=@$body" >/dev/null \
+            || echo "::warning::Could not update the Vitals comment (does the token have pull-requests: write?)"
+        elif [ "$STATUS" != pass ]; then
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$body" >/dev/null \
+            || echo "::warning::Could not comment on the pull request (does the token have pull-requests: write? Pull requests from forks get a read-only token.)"
+        fi
+
+    - name: Pass or fail
+      if: steps.check.outputs.code != '0'
+      shell: bash
+      env:
+        CODE: ${{ steps.check.outputs.code }}
+      run: exit "$CODE"
