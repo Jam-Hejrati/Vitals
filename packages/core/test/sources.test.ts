@@ -44,6 +44,55 @@ describe('HttpClient', () => {
     expect(await http(fetch).getSize('https://x.test/pkg.tgz')).toBe(1979);
   });
 
+  describe('a slow GET', () => {
+    /** A fetch whose first call hangs until aborted; later calls answer at once. */
+    const hangingFirst = () => {
+      const calls: { aborted: () => boolean }[] = [];
+      const fetch = (_url: string, init?: RequestInit) => {
+        const signal = init!.signal!;
+        calls.push({ aborted: () => signal.aborted });
+        if (calls.length > 1) return Promise.resolve(Response.json({ call: calls.length }));
+        return new Promise<Response>((_, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason)),
+        );
+      };
+      return { fetch, calls };
+    };
+
+    it('gets a twin request, and the first answer wins', async () => {
+      const { fetch, calls } = hangingFirst();
+      const client = new HttpClient({ fetch, hedgeMs: 10, retries: 0 });
+      expect(await client.getJson('https://x.test/slow')).toEqual({ call: 2 });
+      expect(calls).toHaveLength(2);
+      expect(calls[0]!.aborted()).toBe(true);
+    });
+
+    it('is not hedged when it answers in time', async () => {
+      const fetch = fakeFetch({ 'https://x.test/': () => ({ ok: true }) });
+      await new HttpClient({ fetch, hedgeMs: 10 }).getJson('https://x.test/fast');
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(fetch.requests).toHaveLength(1);
+    });
+
+    it('still fails at once when the only request fails', async () => {
+      const fetch = () => Promise.reject(new Error('offline'));
+      const client = new HttpClient({ fetch, hedgeMs: 60_000, retries: 0 });
+      await expect(client.getJson('https://x.test/')).rejects.toThrow('offline');
+    });
+  });
+
+  it('does not hedge POST requests', async () => {
+    let calls = 0;
+    const slow = () => {
+      calls++;
+      return new Promise<Response>((resolve) =>
+        setTimeout(() => resolve(Response.json({ ok: true })), 30),
+      );
+    };
+    await new HttpClient({ fetch: slow, hedgeMs: 5 }).postJson('https://x.test/', {});
+    expect(calls).toBe(1);
+  });
+
   it('does not retry client errors', async () => {
     const fetch = fakeFetch({ 'https://x.test/': () => new Response('', { status: 400 }) });
     await expect(http(fetch).getJson('https://x.test/bad')).rejects.toThrow('HTTP 400');

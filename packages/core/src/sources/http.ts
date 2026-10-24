@@ -7,6 +7,12 @@ export interface HttpClientOptions {
   /** Base delay for exponential backoff when the server gives no Retry-After. */
   retryDelayMs?: number;
   timeoutMs?: number;
+  /**
+   * When a GET has not answered after this long, send the same request again and use whichever
+   * answers first. A few requests in every run hang for many seconds, and each one holds up a
+   * whole stage.
+   */
+  hedgeMs?: number;
   userAgent?: string;
 }
 
@@ -26,6 +32,7 @@ export class HttpClient {
   private readonly retries: number;
   private readonly retryDelayMs: number;
   private readonly timeoutMs: number;
+  private readonly hedgeMs: number;
   private readonly userAgent: string;
 
   constructor(options: HttpClientOptions = {}) {
@@ -33,6 +40,7 @@ export class HttpClient {
     this.retries = options.retries ?? 4;
     this.retryDelayMs = options.retryDelayMs ?? 500;
     this.timeoutMs = options.timeoutMs ?? 30_000;
+    this.hedgeMs = options.hedgeMs ?? 2_500;
     this.userAgent = options.userAgent ?? 'vitals (dependency health checker)';
   }
 
@@ -66,11 +74,11 @@ export class HttpClient {
     for (let attempt = 0; ; attempt++) {
       let response: Response;
       try {
-        response = await this.fetch(url, {
+        const request = {
           ...init,
           headers: { accept: 'application/json', 'user-agent': this.userAgent, ...init.headers },
-          signal: AbortSignal.timeout(this.timeoutMs),
-        });
+        };
+        response = await this.attempt(url, request, init.method === 'GET');
       } catch (error) {
         if (attempt >= this.retries) throw error;
         await sleep(this.backoff(attempt));
@@ -85,6 +93,46 @@ export class HttpClient {
       }
       throw new HttpError(response.status, url);
     }
+  }
+
+  /**
+   * One attempt at a request. With `hedge`, a slow request gets a twin after `hedgeMs`; the first
+   * response wins and the other request is aborted. Fails only when every request sent failed.
+   */
+  private attempt(url: string, init: RequestInit, hedge: boolean): Promise<Response> {
+    return new Promise((resolve, reject) => {
+      const controllers: AbortController[] = [];
+      let pending = 0;
+      let settled = false;
+      let timer: NodeJS.Timeout | undefined;
+      const settle = (winner?: AbortController) => {
+        settled = true;
+        clearTimeout(timer);
+        for (const controller of controllers) if (controller !== winner) controller.abort();
+      };
+      const send = () => {
+        const controller = new AbortController();
+        controllers.push(controller);
+        pending++;
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(this.timeoutMs)]);
+        this.fetch(url, { ...init, signal }).then(
+          (response) => {
+            if (settled) return void response.body?.cancel().catch(() => {});
+            settle(controller);
+            resolve(response);
+          },
+          (error: unknown) => {
+            pending--;
+            // Wait for the twin, if one is out; otherwise fail now, not when the timer fires.
+            if (settled || pending > 0) return;
+            settle();
+            reject(error);
+          },
+        );
+      };
+      send();
+      if (hedge) timer = setTimeout(() => settled || send(), this.hedgeMs);
+    });
   }
 
   private backoff(attempt: number, retryAfter?: string | null): number {
