@@ -39,12 +39,14 @@ jobs:
       - run: pnpm -C packages/cli build
 
       # Dogfooding: this repository's own new dependencies.
-      - uses: ./
+      - name: Check this repository's dependencies
+        uses: ./
         with:
           version: ./packages/cli
 
       # The demo project has known problems: the check must fail, and say so.
-      - uses: ./
+      - name: Check the demo project (expected to fail)
+        uses: ./
         id: demo
         continue-on-error: true
         with:
